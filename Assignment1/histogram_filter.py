@@ -21,8 +21,49 @@ class HistogramFilter(object):
         '''
 
         ### Your Algorithm goes Below.
+
+        if action[0] != 0:
+            if action[0] == 1:
+                # print('right')
+                M = np.zeros((20,20))
+                b = np.full((1,19),0.9, dtype=float)[0]
+                M = np.diag(b,1)
+                np.fill_diagonal(M,0.1)
+                M[-1][-1] = 1
+            elif action[0] == -1:
+                # print('left')
+                M = np.zeros((20,20))
+                b = np.full((1,19),0.9, dtype=float)[0]
+                M = np.diag(b,1)
+                np.fill_diagonal(M,0.1)
+                M[-1][-1] = 1
+                M=np.flip(M,1)
+            belief = belief*M
+        elif action[0] == 0:
+            if action[1] != 0:
+                if action[1] == 1:
+                    # print('up')
+                    M = np.zeros((20,20))
+                    b = np.full((1,19),0.9, dtype=float)[0]
+                    M = np.diag(b,1)
+                    np.fill_diagonal(M,0.1)
+                    M[-1][-1] = 1
+                elif action[1] == -1:
+                    # print('down')
+                    M = np.zeros((20,20))
+                    b = np.full((1,19),0.9, dtype=float)[0]
+                    M = np.diag(b,1)
+                    np.fill_diagonal(M,0.1)
+                    M[-1][-1] = 1
+                    M=np.flip(M,1)
+                belief_T = belief.T*M
+                belief = belief_T.T
+            elif action[1] == 0:
+                M = 0
+
+
         belief_update = np.random.rand(20, 20)
 
-        return belief_update
+        return belief
 
         
