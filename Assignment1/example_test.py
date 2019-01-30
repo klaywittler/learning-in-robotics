@@ -17,7 +17,7 @@ if __name__ == "__main__":
     #### Test your code here
     # size = 0
     # print(cmap.size())
-    belief = np.full((20, 20), 1.0/400, dtype=np.float_)
+    belief = np.full((20, 20), 1.0/400, dtype=float)
     H = HistogramFilter()
 
     for i in range(len(actions)):
@@ -26,10 +26,11 @@ if __name__ == "__main__":
         p = np.amax(belief)
         idx = np.unravel_index(np.argmax(belief), belief.shape)
         belief_state = np.asarray(idx)
+        # print(belief)
         print('estimated',belief_state)
         print('actual',belief_states[i])
 
-    # print(cmap)
+    print(cmap)
     # print(actions)
     # print(observations)
     # print(belief_states)
