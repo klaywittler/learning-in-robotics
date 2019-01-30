@@ -30,7 +30,7 @@ if __name__ == "__main__":
         print('estimated',belief_state)
         print('actual',belief_states[i])
 
-    print(cmap)
+    # print(cmap)
     # print(actions)
     # print(observations)
     # print(belief_states)

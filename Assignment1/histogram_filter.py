@@ -21,57 +21,40 @@ class HistogramFilter(object):
         '''
 
         ### Your Algorithm goes Below.
-        print(action)
-        print(observation)
+        # print(action)
+        # print(observation)
 
+        M = np.copy(cmap.astype(float))
         if observation != 0:
-            print('see color')
-            M = np.copy(cmap.astype(float))
+            # print('see color')    
             M[M == 1] = 0.9
             M[M == 0] = 0.1
         elif observation == 0:
-            print('no color')
-            M = np.copy(cmap.astype(float))
+            # print('no color')
             M[M == 1] = 0.1
             M[M == 0] = 0.9
 
+        T = np.zeros((20,20))
+        b = np.full((1,19),0.9, dtype=float)[0]
+        T = np.diag(b,1)
+        np.fill_diagonal(T,0.1)
+        T[-1][-1] = 1
+
         if action[0] != 0:
-            if action[0] == 1:
-                print('right')
-                T = np.zeros((20,20))
-                b = np.full((1,19),0.9, dtype=float)[0]
-                T = np.diag(b,1)
-                np.fill_diagonal(T,0.1)
-                T[-1][-1] = 1
-            elif action[0] == -1:
-                print('left')
-                T = np.zeros((20,20))
-                b = np.full((1,19),0.9, dtype=float)[0]
-                T = np.diag(b,1)
-                np.fill_diagonal(T,0.1)
-                T[-1][-1] = 1
+            if action[0] == -1:
                 T=np.flip(T,1)
-            belief_T = belief*T
+                T= np.flipud(T)
+                # print(T)
+            belief_T = np.dot(belief,T)
             belief = np.multiply(M,belief_T)
         elif action[0] == 0:
             if action[1] != 0:
-                if action[1] == 1:
-                    print('up')
-                    T = np.zeros((20,20))
-                    b = np.full((1,19),0.9, dtype=float)[0]
-                    T = np.diag(b,1)
-                    np.fill_diagonal(T,0.1)
-                    T[-1][-1] = 1
-                elif action[1] == -1:
-                    print('down')
-                    T = np.zeros((20,20))
-                    b = np.full((1,19),0.9, dtype=float)[0]
-                    T = np.diag(b,1)
-                    np.fill_diagonal(T,0.1)
-                    T[-1][-1] = 1
+                if action[1] == -1:
                     T=np.flip(T,1)
-                belief_T = belief.T*T
-                belief = np.multiply(M, belief_T.T)
+                    T= np.flipud(T)
+                    # print(T)
+                belief_T = np.dot(np.transpose(belief),T)
+                belief = np.multiply(M, np.transpose(belief_T))
             elif action[1] == 0:
                 T = np.eye(20,20)
                 belief = np.multiply(M,belief*T)
