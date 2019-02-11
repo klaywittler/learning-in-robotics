@@ -15,20 +15,17 @@ if __name__ == "__main__":
 
 
     #### Test your code here
-    # size = 0
-    # print(cmap.size())
-    belief = np.full((20, 20), 1.0/400, dtype=float)
+    m = np.shape(cmap)
+    belief = np.full(m, 1.0/(m[0]*m[1]), dtype=float)
     H = HistogramFilter()
 
     for i in range(len(actions)):
         # print(i)
-        belief = H.histogram_filter(cmap, belief, actions[i], observations[i])
-        p = np.amax(belief)
-        idx = np.unravel_index(np.argmax(belief), belief.shape)
-        belief_state = np.asarray(idx)
-        # print(belief)
+        belief,belief_state = H.histogram_filter(cmap, belief, actions[i], observations[i])
+        
         print('estimated',belief_state)
-        print('actual',belief_states[i])
+        # print('actual',belief_states[i])
+
 
     # print(cmap)
     # print(actions)

@@ -21,8 +21,6 @@ class HistogramFilter(object):
         '''
 
         ### Your Algorithm goes Below.
-        # print(action)
-        # print(observation)
 
         M = np.copy(cmap.astype(float))
         if observation != 0:
@@ -34,8 +32,10 @@ class HistogramFilter(object):
             M[M == 1] = 0.1
             M[M == 0] = 0.9
 
-        T = np.zeros((20,20))
-        b = np.full((1,19),0.9, dtype=float)[0]
+        # M = np.flip(np.transpose(M),0)
+        m = np.shape(M)
+        T = np.zeros(m)
+        b = np.full((1,m[0]-1),0.9, dtype=float)[0]
         T = np.diag(b,1)
         np.fill_diagonal(T,0.1)
         T[-1][-1] = 1
@@ -49,20 +49,25 @@ class HistogramFilter(object):
             belief = np.multiply(M,belief_T)
         elif action[0] == 0:
             if action[1] != 0:
-                if action[1] == -1:
+                if action[1] == 1:
                     T=np.flip(T,1)
                     T= np.flipud(T)
                     # print(T)
-                belief_T = np.dot(np.transpose(belief),T)
-                belief = np.multiply(M, np.transpose(belief_T))
+                belief_T = np.dot(np.transpose(T),belief)
+                # belief_T = np.dot(np.transpose(belief),T)
+                belief = np.multiply(M, belief_T)
             elif action[1] == 0:
-                T = np.eye(20,20)
-                belief = np.multiply(M,belief*T)
+                T = np.eye(m[0]-1,m[0]-1)
+                belief = np.multiply(M,np.dot(belief,T))
 
         # belief_update = np.random.rand(20, 20)
         n = belief.sum(dtype=float)
         belief = belief/n
 
-        return belief
+        idx = np.unravel_index(np.argmax(belief), belief.shape)
+        belief_state = np.asarray(idx)
+        belief_state = [belief_state[1],m[0]-1-belief_state[0]]
+
+        return belief, belief_state
 
         
