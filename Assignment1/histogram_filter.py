@@ -21,8 +21,8 @@ class HistogramFilter(object):
         '''
 
         ### Your Algorithm goes Below.
-        # print(action)
-        # print(observation)
+        print(action)
+        print(observation)
 
         M = np.copy(cmap.astype(float))
         if observation != 0:
@@ -45,6 +45,7 @@ class HistogramFilter(object):
                 T=np.flip(T,1)
                 T= np.flipud(T)
                 # print(T)
+            # belief_T = belief*T    
             belief_T = np.dot(belief,T)
             belief = np.multiply(M,belief_T)
         elif action[0] == 0:
@@ -53,6 +54,7 @@ class HistogramFilter(object):
                     T=np.flip(T,1)
                     T= np.flipud(T)
                     # print(T)
+                # belief_T = np.transpose(belief)*T
                 belief_T = np.dot(np.transpose(belief),T)
                 belief = np.multiply(M, np.transpose(belief_T))
             elif action[1] == 0:
