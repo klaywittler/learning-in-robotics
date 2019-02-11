@@ -45,6 +45,7 @@ class HistogramFilter(object):
                 T=np.flip(T,1)
                 T= np.flipud(T)
                 # print(T)
+            # belief_T = belief*T    
             belief_T = np.dot(belief,T)
             belief = np.multiply(M,belief_T)
         elif action[0] == 0:
@@ -56,6 +57,9 @@ class HistogramFilter(object):
                 belief_T = np.dot(np.transpose(T),belief)
                 # belief_T = np.dot(np.transpose(belief),T)
                 belief = np.multiply(M, belief_T)
+                # belief_T = np.transpose(belief)*T
+                belief_T = np.dot(np.transpose(belief),T)
+                belief = np.multiply(M, np.transpose(belief_T))
             elif action[1] == 0:
                 T = np.eye(m[0]-1,m[0]-1)
                 belief = np.multiply(M,np.dot(belief,T))
