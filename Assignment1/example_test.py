@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     #### Test your code here
     m = np.shape(cmap)
-    belief = np.full(m, 1.0/(m[0]*m[1]), dtype=float)
+    belief = np.full(m, 1.0/(m[0]*m[1]), dtype=float) # prior belief is uniform distribution
     H = HistogramFilter()
 
     for i in range(len(actions)):
