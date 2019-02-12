@@ -22,7 +22,6 @@ if __name__ == "__main__":
     for i in range(len(actions)):
         # print(i)
         belief,belief_state = H.histogram_filter(cmap, belief, actions[i], observations[i])
-        
         print('estimated',belief_state)
         # print('actual',belief_states[i])
 

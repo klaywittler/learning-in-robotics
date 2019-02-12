@@ -25,49 +25,45 @@ class HistogramFilter(object):
         M = np.copy(cmap.astype(float))
         if observation != 0:
             # print('see color')    
-            M[M == 1] = 0.9
-            M[M == 0] = 0.1
+            M[M == 1] = 0.9 # probability that sensor it correct given it has seen a color
+            M[M == 0] = 0.1 # probability that sensor it wrong given it has seen a color
         elif observation == 0:
             # print('no color')
-            M[M == 1] = 0.1
-            M[M == 0] = 0.9
+            M[M == 1] = 0.1 # probability that sensor it wrong given it didn't see a color
+            M[M == 0] = 0.9 # probability that sensor it correct given it didn't see a color
 
-        # M = np.flip(np.transpose(M),0)
+        # 90% probability to move, 10% probability to stay stationary 
         m = np.shape(M)
         T = np.zeros(m)
         b = np.full((1,m[0]-1),0.9, dtype=float)[0]
         T = np.diag(b,1)
         np.fill_diagonal(T,0.1)
-        T[-1][-1] = 1
+        T[-1][-1] = 1 # right movement action transition matrix - 0.1 across diagonal with 0.9 in spot to the right
 
-        if action[0] != 0:
-            if action[0] == -1:
+        if action[0] != 0: # right
+            if action[0] == -1: # left
                 T=np.flip(T,1)
-                T= np.flipud(T)
-                # print(T)
-            # belief_T = belief*T    
-            belief_T = np.dot(belief,T)
-            belief = np.multiply(M,belief_T)
-        elif action[0] == 0:
-            if action[1] != 0:
-                if action[1] == 1:
+                T= np.flipud(T)  # left movement is a flipped version of right transition matrix
+            belief_T = np.dot(belief,T) # action update
+            belief = np.multiply(M,belief_T) # measurement update
+        elif action[0] == 0: 
+            if action[1] != 0:  # down
+                # down movements correspond to premultiplying the traspose of the right transition matrix
+                # up movements correspond to premultiplying the traspose of the left transition matrix
+                if action[1] == 1: # up
                     T=np.flip(T,1)
-                    T= np.flipud(T)
-                    # print(T)
-                belief_T = np.dot(np.transpose(T),belief)
-                # belief_T = np.dot(np.transpose(belief),T)
-                belief = np.multiply(M, belief_T)
-                # belief_T = np.transpose(belief)*T
-                belief_T = np.dot(np.transpose(belief),T)
-                belief = np.multiply(M, np.transpose(belief_T))
-            elif action[1] == 0:
+                    T= np.flipud(T) # construction the movement left transition matrix
+                belief_T = np.dot(np.transpose(T),belief) # action update
+                belief = np.multiply(M, belief_T) # measurement update
+            elif action[1] == 0: # no movement case
                 T = np.eye(m[0]-1,m[0]-1)
                 belief = np.multiply(M,np.dot(belief,T))
 
-        # belief_update = np.random.rand(20, 20)
+        # normalization
         n = belief.sum(dtype=float)
         belief = belief/n
 
+        # maximum likelihood estimate
         idx = np.unravel_index(np.argmax(belief), belief.shape)
         belief_state = np.asarray(idx)
         belief_state = [belief_state[1],m[0]-1-belief_state[0]]
