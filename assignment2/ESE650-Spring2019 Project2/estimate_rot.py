@@ -20,7 +20,7 @@ def estimate_rot(data_num=1):
     ts = imu['ts'][0] - imu['ts'][0,0]
 
     accelVals = calibrate(ts,accelVals,'accelerometer',calibrate=False)
-    gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=True)
+    gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=False)
 
     plotMeasure(accelVals,gyroVals)
     roll, pitch = accelerometer(accelVals)
