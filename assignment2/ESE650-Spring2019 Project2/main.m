@@ -1,4 +1,4 @@
-addpath('imu')
+ addpath('imu')
 addpath('vicon')
 
 load('imuRaw1.mat')
