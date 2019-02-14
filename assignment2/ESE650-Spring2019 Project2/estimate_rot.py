@@ -19,9 +19,10 @@ def estimate_rot(data_num=1):
     gyroVals = imu['vals'][3::]
     ts = imu['ts'][0] - imu['ts'][0,0]
 
-    accelVals = calibrate(ts,accelVals,'accelerometer',calibrate=True)
+    accelVals = calibrate(ts,accelVals,'accelerometer',calibrate=False)
     gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=True)
 
+    plotMeasure(accelVals,gyroVals)
     roll, pitch = accelerometer(accelVals)
     yaw = 0
     # print(roll)
@@ -69,9 +70,9 @@ if __name__ == "__main__":
     vicon = sio.loadmat(viconFile)
     viconRot = vicon['rots']
     viconTS = vicon['ts']  
-    g = np.tile(np.array([[0],[0],[-1]]),len(viconRot[0,0,:]))
-    a = np.dot(viconRot[:,:,:],g[:,:,np.newaxis])
-    print(len(a[:,0,0]))
+    # g = np.tile(np.array([[0],[0],[-1]]),len(viconRot[0,0,:]))
+    # a = np.dot(viconRot[:,:,:],g[:,:,np.newaxis])
+    # print(len(a[:,0,0]))
     [r,p,y] = estimate_rot(data_num)
     # print(r)
     # print(p)
