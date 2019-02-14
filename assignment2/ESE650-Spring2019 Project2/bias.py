@@ -11,8 +11,8 @@ def calibrate(ts,vals,sensor,calibrate=False,iteration=700):
             bias = np.transpose(np.array([[510.322936459452,500.225993485033,605.15857143]]))
             scale =  np.transpose(np.array([[-104.047762473456,-102.994632975264,-102.630243325576]]))
         elif sensor == 'gyro':
-            bias =  np.transpose(np.array([[369.68571429,373.57142857,375.37285714]]))
-            scale =  np.transpose(np.array([[1,1,1]]))
+            bias =  np.transpose(np.array([[370.040275601405,373.743749965801,375.593248984362]]))
+            scale =  np.transpose(np.array([[-0.00520804281847987,-0.00213666125103214,-0.0285429019421436]]))
         else:
             return 'error'
 

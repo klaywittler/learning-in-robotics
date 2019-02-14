@@ -20,24 +20,25 @@ def estimate_rot(data_num=1):
     ts = imu['ts'][0] - imu['ts'][0,0]
 
     accelVals = calibrate(ts,accelVals,'accelerometer',calibrate=False)
-    gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=True)
+    gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=False)
 
-    plotMeasure(accelVals,gyroVals)
+    # plotMeasure(accelVals,gyroVals)
     roll, pitch = accelerometer(accelVals)
     yaw = 0
-    # print(roll)
-    # print(pitch)
+    print(roll)
+    print(pitch)
 
     Droll,Dpitch,Dyaw = gyro(gyroVals,ts)
+    w = np.array([roll,pitch,yaw,Droll,Dpitch,Dyaw])
     # print(Droll)
     # print(Dpitch)
     # print(Dyaw)
 
-    roll,pitch,yaw = UKF()
+    roll,pitch,yaw = UKF(ts,w)
     return roll,pitch,yaw
 
 
-def UKF():
+def UKF(t,w):
     roll = 0
     pitch = 0
     yaw = 0
