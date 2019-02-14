@@ -20,7 +20,3 @@ def gyro(gyroVals,t):
     Dyaw = np.trapz([z[1::],z[0:-1]],dx=dt,axis=0)
     return Droll,Dpitch,Dyaw 
 
-
-def UKF():
-
-	return 0
