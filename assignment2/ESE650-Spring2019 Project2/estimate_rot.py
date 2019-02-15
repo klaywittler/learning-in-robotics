@@ -16,27 +16,43 @@ def estimate_rot(data_num=1):
     #your code goes here
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
-    accelVals = imu['vals'][0:3]
-    gyroVals = imu['vals'][3::]
-    ts = imu['ts'][0] - imu['ts'][0,0]
+    accelVals = imu['vals'][0:3,0:5545]
+    gyroVals = imu['vals'][3::,0:5545]
+    tsI = imu['ts'][0,0:5545]
+    dtI = tsI - tsI[0]
 
-    accelVals, accelVar = calibrate(ts,accelVals,'accelerometer',calibrate=False)
-    gyroVals, gyroVar = calibrate(ts,gyroVals,'gyro',calibrate=False)
+    viconFile = 'vicon/viconRot' + str(data_num) + '.mat'
+    vicon = sio.loadmat(viconFile)
+    viconRot = vicon['rots'][:,:,16::]
+    tsV = vicon['ts'][0,16::]
+
+    accelVals, accelVar = calibrate(tsI,accelVals,'accelerometer',calibrate=False)
+    gyroVals, gyroVar = calibrate(tsI,gyroVals,'gyro',calibrate=False)
 
     # plotMeasure(accelVals,gyroVals)
     roll, pitch = accelerometer(accelVals)
-    yaw = 0
-    print(roll)
-    print(pitch)
+    yaw = np.zeros(roll.shape)
 
-    Droll,Dpitch,Dyaw = gyro(gyroVals,ts)
+    Droll,Dpitch,Dyaw = gyro(gyroVals,dtI)
+    # print(roll)
+    # print(pitch)
     # print(Droll)
     # print(Dpitch)
     # print(Dyaw)
 
-    x = np.array([roll,pitch,yaw,Droll,Dpitch,Dyaw])
-    w = np.array([accelVar, gyroVar])
-    roll,pitch,yaw = UKF(ts,x,w)
+    R0 = viconRot[:,:,15]
+    q0 = rot2quat(R0)
+    x = np.array([q0[0],q0[1],q0[2],q0[3],Droll[0],Dpitch[0],Dyaw[0]])
+    # print(x[4::])
+    p = 0.1*np.eye(6)
+    q = 0.1*np.eye(6)
+    # z = np.array([roll,pitch,yaw,Droll,Dpitch,Dyaw])
+    r = np.array([accelVar, gyroVar])
+    for i in range(len(tsI)-1):
+        dt = tsI[i+1]-tsI[i]
+        z = np.array([roll[i],pitch[i],yaw[i],Droll[i],Dpitch[i],Dyaw[i]])
+        x,p = UKF(dt,x,p,q,z,r)
+
     return roll,pitch,yaw
 
 
@@ -66,15 +82,12 @@ if __name__ == "__main__":
     vicon = sio.loadmat(viconFile)
     viconRot = vicon['rots']
     viconTS = vicon['ts']  
-    # g = np.tile(np.array([[0],[0],[-1]]),len(viconRot[0,0,:]))
-    # a = np.dot(viconRot[:,:,:],g[:,:,np.newaxis])
-    # print(len(a[:,0,0]))
+
     [r,p,y] = estimate_rot(data_num)
     # print(r)
     # print(p)
     # print(y)
-    # a = np.array([1,2,3,4])
-    # print(a[0:2])
+
     # file = 'imu/imuRaw' + str(data_num) + '.mat'
     # imu = sio.loadmat(file)
     # accelVals = imu['vals'][0:3]

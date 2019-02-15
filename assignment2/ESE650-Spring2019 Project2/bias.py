@@ -8,6 +8,9 @@ def calibrate(ts,vals,sensor,calibrate=False,iteration=700):
         # bias = np.array([np.repeat(bias[0],len(vals[0])), np.repeat(bias[1],len(vals[1])), np.repeat(bias[2],len(vals[2]))])
         scale = np.transpose(np.array([[1,1,1]]))
         variance = np.array([1,1,1])
+        # g = np.tile(np.array([[0],[0],[-1]]),len(viconRot[0,0,:]))
+        # a = np.dot(viconRot[:,:,:],g[:,:,np.newaxis])
+        # print(len(a[:,0,0]))
     else:
         if sensor == 'accelerometer':
             bias = np.transpose(np.array([[510.322936459452,500.225993485033,605.15857143]]))
