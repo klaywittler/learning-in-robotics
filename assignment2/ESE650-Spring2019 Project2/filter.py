@@ -26,8 +26,15 @@ def quatMult(q1,q2):
 def quat2rot(q):
     u0 = q[0]
     u = q[1::]
-    R = np.matmult((u0**2 - np.inner(np.transpose(u),u)),np.eye(3)) +2*u0,skew(u) + 2*np.outer(u,np.transpose(u))
+    R = np.matmult((u0**2 - np.inner(np.transpose(u),u)),np.eye(3)) +2*u0,vec2skew(u) + 2*np.outer(u,np.transpose(u))
     return R
+
+def rot2quat(R):
+    theta = np.arccos((np.trace(R) - 1)/2)
+    what = (R - np.transpose(R))/(2*np.sin(theta))
+    w = skew2vec(what)
+    q = axang2quat(theta,w)
+    return  
 
 
 def axang2quat(w,t=None):
@@ -40,5 +47,9 @@ def axang2quat(w,t=None):
     return np.array([np.cos(theta/2),np.sin(theta/2)*u])
 
 
-def skew(x):
+def skew2vec(x):
+    return np.array([x[1,2], x[0,2],x[1,0]])
+
+
+def vec2skew(x):
     return np.array([[0, -x[2], x[1]], [x[2], 0, x[0]], [x[1], x[0], 0]])
