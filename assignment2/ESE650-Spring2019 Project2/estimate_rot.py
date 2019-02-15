@@ -8,6 +8,7 @@ import scipy.io as sio
 import math as m
 from bias import *
 from motion import *
+from filter import *
 import matplotlib.pyplot as plt
 
 
@@ -19,8 +20,8 @@ def estimate_rot(data_num=1):
     gyroVals = imu['vals'][3::]
     ts = imu['ts'][0] - imu['ts'][0,0]
 
-    accelVals = calibrate(ts,accelVals,'accelerometer',calibrate=False)
-    gyroVals = calibrate(ts,gyroVals,'gyro',calibrate=False)
+    accelVals, accelVar = calibrate(ts,accelVals,'accelerometer',calibrate=False)
+    gyroVals, gyroVar = calibrate(ts,gyroVals,'gyro',calibrate=False)
 
     # plotMeasure(accelVals,gyroVals)
     roll, pitch = accelerometer(accelVals)
@@ -29,19 +30,13 @@ def estimate_rot(data_num=1):
     print(pitch)
 
     Droll,Dpitch,Dyaw = gyro(gyroVals,ts)
-    w = np.array([roll,pitch,yaw,Droll,Dpitch,Dyaw])
     # print(Droll)
     # print(Dpitch)
     # print(Dyaw)
 
-    roll,pitch,yaw = UKF(ts,w)
-    return roll,pitch,yaw
-
-
-def UKF(t,w):
-    roll = 0
-    pitch = 0
-    yaw = 0
+    x = np.array([roll,pitch,yaw,Droll,Dpitch,Dyaw])
+    w = np.array([accelVar, gyroVar])
+    roll,pitch,yaw = UKF(ts,x,w)
     return roll,pitch,yaw
 
 

@@ -16,8 +16,8 @@ b = norm(a(:,1));
 
 idx = 3;
 scatter(a(idx,16:end),vals(idx,1:end-99))
-Pa = polyfit(a(idx,16:end),vals(idx,1:end-99),1);
-
+[Pa,Sa,mua] = polyfit(a(idx,16:end),vals(idx,1:end-99),1);
+ 
 Rt = rots(:,:,1:end-1);
 Rtp1 = rots(:,:,2:end);
 dt = tVicon(2:end) - tVicon(1:end-1);
@@ -35,7 +35,7 @@ n = vecnorm(w,2,1);
 
 gyro = 3;
 scatter(w(idx,16:end),vals(idx+gyro,1:end-100))
-Pg = polyfit(w(idx,16:end),vals(idx+gyro,1:end-100),1);
+[Pg,Sb,mub] = polyfit(w(idx,16:end),vals(idx+gyro,1:end-100),1);
 
 
 
