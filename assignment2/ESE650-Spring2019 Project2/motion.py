@@ -6,7 +6,7 @@ def accelerometer(accelVals):
     y = accelVals[1]
     z = accelVals[2]
     roll = np.arctan2(y, z)
-    pitch = np.arctan2(-x, np.linalg.norm([y, z],axis=0))
+    pitch = np.arctan2(-x, np.linalg.norm(np.array([y, z]),axis=0))
     yaw = np.zeros(roll.shape)
     return roll, pitch, yaw 
 
