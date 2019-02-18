@@ -5,25 +5,30 @@ import scipy.io as sio
 def calibrate(ts,vals,sensor,calibrate=False,iteration=700):
     if calibrate:
         bias = np.transpose(np.array([np.average(vals[:, 0:iteration],axis=1)]))
-        # bias = np.array([np.repeat(bias[0],len(vals[0])), np.repeat(bias[1],len(vals[1])), np.repeat(bias[2],len(vals[2]))])
-        scale = np.transpose(np.array([[1,1,1]]))
+        sensitivity = 200
+        factor = 3300/1023/sensitivity
+        scale = np.transpose(np.array([[factor,factor,factor]]))
         variance = np.array([1,1,1])
         # g = np.tile(np.array([[0],[0],[-1]]),len(viconRot[0,0,:]))
         # a = np.dot(viconRot[:,:,:],g[:,:,np.newaxis])
         # print(len(a[:,0,0]))
     else:
         if sensor == 'accelerometer':
-            bias = np.transpose(np.array([[510.322936459452,500.225993485033,605.15857143]]))
-            scale =  np.transpose(np.array([[-104.047762473456,-102.994632975264,-102.630243325576]]))
+            bias = np.transpose(np.array([[510.80714286,500.99428571,605.15857143]]))
+            sensitivity = -200
+            factor = 3300/1023/sensitivity
+            scale = np.transpose(np.array([[factor,factor,factor]]))
             variance = np.array([0.3804**2,0.3425**2,0.3547**2])
         elif sensor == 'gyro':
-            bias =  np.transpose(np.array([[370.040275601405,373.743749965801,375.593248984362]]))
-            scale =  np.transpose(np.array([[-0.00520804281847987,-0.00213666125103214,-0.0285429019421436]]))
+            bias =  np.transpose(np.array([[369.68571429,373.57142857,375.37285714]]))
+            sensitivity = 200
+            factor = 3300/1023/sensitivity
+            scale = np.transpose(np.array([[factor,factor,factor]]))
             variance = np.array([6.168**2,15.9328**2,2.6225**2])
         else:
             return 'error'
 
-    corrected = np.divide((vals - bias),scale)
+    corrected = np.multiply((vals - bias),scale)
     return corrected, variance
 
 
