@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse.linalg as ssp
-import scipy as sp
+import scipy.linalg as sp
 
 
 def UKF(dt,x,P,Q,z,R):
@@ -10,7 +10,7 @@ def UKF(dt,x,P,Q,z,R):
     n = len(P[0,:])
 
     # getting sigma points
-    S = sp.linalg.cholesky(2*n*(P+Q))
+    S = sp.cholesky(2*n*(P+Q))
     Sq = S[0:3,:]
     Sw = S[3::,:]
     Wq = axang2quat(Sq,normalize=True)
@@ -31,11 +31,10 @@ def UKF(dt,x,P,Q,z,R):
     x_k = np.concatenate((xq_k,xw_k),axis=0)
 
     # expected measurement characterization
-    g = np.array([0,0,0,-sp.constants(g)])
+    g = np.array([0,0,0,-9.80665])
     Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
     Zq_k = quat2axang(Zq)
     zq_k = np.mean(Zq_k,axis=1)
-    print(Zq_k)
     Z_k = np.concatenate((Zq_k,Yw),axis=0)
     z_k = np.concatenate((zq_k,xw_k),axis=0)
     v = z - z_k
@@ -54,11 +53,11 @@ def UKF(dt,x,P,Q,z,R):
 
 
 def quatMult(q1,q2, normalize=False):
-    t0 = q2[0]*q1[0] - q2[1]*q1[1] - q2[2]*q1[2] - q2[3]*q1[3]
-    t1 = q2[0]*q1[1] + q2[1]*q1[0] - q2[2]*q1[3] + q2[3]*q1[2]
-    t2 = q2[0]*q1[2] + q2[1]*q1[3] + q2[2]*q1[0] - q2[3]*q1[1]
-    t3 = q2[0]*q1[3] - q2[1]*q1[2] + q2[2]*q1[1] + q2[3]*q1[0]
-    q = np.array([t0,t1,t2,t3])
+    qw = q2[0]*q1[0] - q2[1]*q1[1] - q2[2]*q1[2] - q2[3]*q1[3]
+    qi = q2[0]*q1[1] + q2[1]*q1[0] - q2[2]*q1[3] + q2[3]*q1[2]
+    qj = q2[0]*q1[2] + q2[1]*q1[3] + q2[2]*q1[0] - q2[3]*q1[1]
+    qk = q2[0]*q1[3] - q2[1]*q1[2] + q2[2]*q1[1] + q2[3]*q1[0]
+    q = np.array([qw,qi,qj,qk])
     if normalize:
         q = q/np.linalg.norm(q,axis=0)
     return q
@@ -80,7 +79,7 @@ def quat2rot(q):
 
 
 def rot2quat(R):
-    angle = np.arccos((np.trace(R) - 1)/2)
+    angle = np.arccos((np.trace(R) - 1)/2.0)
     eigVals, eigVec = ssp.eigs(R, k=1, sigma=1)
     axis = np.array([eigVec[0,0],eigVec[1,0],eigVec[2,0]])
     q = axang2quat(axis*angle)
@@ -118,11 +117,11 @@ def rot2eul(R):
             yaw = np.arctan2(-R[0,1], R[1,1])
             pitch = np.arctan2(-R[2,0], R[2,2]);
         else: # R(3,2) == -1
-            roll = -np.pi/2;
+            roll = -np.pi/2.0
             yaw = -np.arctan2(R[0,2],R[0,0])
             pitch = 0
     else: # R(3,2) == +1
-        roll = np.pi/2
+        roll = np.pi/2.0
         yaw = np.arctan2(R[0,2],R[0,0])
         pitch = 0
     return roll, pitch, yaw
@@ -157,7 +156,7 @@ def axang2quat(w,t=None, normalize=False):
 
 
 def quat2axang(q):
-    angle = 2*np.arccos(q[0])
+    angle = 2.0*np.arccos(q[0])
     axis = q[1::]/np.sqrt(1-q[0]**2)
     return axis*angle
 

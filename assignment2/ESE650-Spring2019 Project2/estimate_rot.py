@@ -27,8 +27,8 @@ def estimate_rot(data_num=1):
 
     x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
     P = 10*np.eye(6)
-    Q = 30*np.eye(6)
-    R = 30*np.eye(6)
+    Q = 70*np.eye(6)
+    R = 70*np.eye(6)
     roll = np.zeros(accelVals.shape[1])
     pitch = np.zeros(accelVals.shape[1])
     yaw = np.zeros(accelVals.shape[1])
