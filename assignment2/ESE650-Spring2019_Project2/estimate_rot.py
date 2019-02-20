@@ -3,27 +3,23 @@
 #write a function that takes in an input number (1 through 6)
 #reads in the corresponding imu Data, and estimates 
 #roll pitch and yaw using an extended kalman filter
-import time
 import numpy as np
 import scipy.io as sio
 from bias import *
-from motion import *
 from filter import *
 import matplotlib.pyplot as plt
 
 
 def estimate_rot(data_num=1):
-    print('estimating ...')
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
-    # accelVals = np.array([imu['vals'][0,:],imu['vals'][1,:],imu['vals'][2,:]])
     gyroVals = np.array([imu['vals'][4,:],imu['vals'][5,:],imu['vals'][3,:]])
     tsI = imu['ts'][0,:]
-    dtI = tsI - tsI[0]
+    dt = imu['ts'][0,1::]-imu['ts'][0,0:-1]
 
-    accelVals = calibrate(tsI,accelVals,'accelerometer')
-    gyroVals = calibrate(tsI,gyroVals,'gyro')
+    accelVals = calibrate(accelVals,'accelerometer')
+    gyroVals = calibrate(gyroVals,'gyro')
 
     x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
     P = 10.0*np.eye(6)
@@ -35,10 +31,8 @@ def estimate_rot(data_num=1):
     orient = np.zeros((4,len(accelVals[0,:])))
 
     for i in range(len(tsI)-1): # len(tsI)-1
-        # print(i)
-        dt = tsI[i+1]-tsI[i]
         z = np.array([accelVals[0,i],accelVals[1,i],-accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x,P = UKF(dt,x,P,Q,z,R)
+        x,P = UKF(dt[i],x,P,Q,z,R)
         roll[i], pitch[i], yaw[i] = quat2eul(x[0:4])
         orient[:,i] = x[0:4]
         # print(x[0:4])
@@ -63,11 +57,11 @@ if __name__ == "__main__":
     plot([r[0:5545],p[0:5545],y[0:5545]],[vroll,vpitch,vyaw])
 
     # q = estimate_rot(data_num)
-    # g = np.array([0,0,1])
+    # g = np.array([0,0,9.80665])
     # a  = np.zeros((len(g),len(viconRot[0,0,:])))
     # a_estim = np.zeros((len(g),len(viconRot[0,0,:])))
     # for i in range(len(viconRot[0,0,:])):
-    #     temp = quatMult(quatMult(q[:,i],np.array([0,0,0,1])),quatCong(q[:,i]))
+    #     temp = quatMult(quatMult(q[:,i],np.array([0,0,0,9.80665])),quatCong(q[:,i]))
     #     a_estim[:,i] = np.array([temp[1],temp[2],temp[3]])
     #     a[:,i] = np.dot(viconRot[:,:,i],g)
 

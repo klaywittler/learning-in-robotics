@@ -2,7 +2,6 @@ import numpy as np
 import scipy.sparse.linalg as ssp
 import scipy.linalg as sp
 
-
 def UKF(dt,x,P,Q,z,R):
     nrm = False
     xq = x[0:4]
@@ -31,16 +30,10 @@ def UKF(dt,x,P,Q,z,R):
     g = np.array([0,0,0,9.80665])
     Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
     Zq_k = Zq[1::,:]
-    # print(Zq_k)
     zq_k = np.mean(Zq_k,axis=1)
-    # print(zq_k)
-    # print(np.linalg.norm(zq_k,axis=0))
     Z_k = np.concatenate((Zq_k-zq_k[:,np.newaxis],Ww),axis=0)
     z_k = np.concatenate((zq_k,xw_k),axis=0)
-
     v = z - z_k
-    # print(np.linalg.norm(Zq,axis=0))
-    # print(np.linalg.norm((quat2axang(zq_k))))
     
     # Covariance update
     Pzz = np.dot(Z_k,np.transpose(Z_k))/(2.0*n)
@@ -55,7 +48,6 @@ def UKF(dt,x,P,Q,z,R):
     xkw = xw_k + Kp[3::]
     Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))
     xk = np.concatenate((xkq,xkw))
-
     return xk,Pk
 
 
@@ -63,7 +55,7 @@ def quatMean(Yq,xq,normalize=False):
     qBar = quatCong(xq)
     error = 1.0
     count = 0
-    while error >= 10**-2:
+    while error >= 10**-1:
         Eq = quatMult(Yq,qBar,normalize=normalize)
         eVec = quat2axang(Eq)
         eMean = np.mean(eVec, axis=1)
@@ -71,7 +63,7 @@ def quatMean(Yq,xq,normalize=False):
         eq = axang2quat(eMean)
         qBar = quatMult(eq,qBar,normalize=normalize)
         count += 1
-        if count >= 100:
+        if count >= 50:
             break
     return qBar, eVec
 
@@ -93,62 +85,6 @@ def quatCong(q):
     else:
         p = np.array([1.0,-1.0,-1.0,-1.0])
     return np.multiply(q,p)
-
-
-def quat2rot(q):
-    u0 = q[0]
-    u = q[1::]
-    R = (u0**2 - np.inner(np.transpose(u),u))*np.eye(3) + 2.0*u0*veemap(u) + 2.0*np.outer(u,np.transpose(u))
-    return R
-
-
-def rot2quat(R):
-    angle = np.arccos((np.trace(R) - 1)/2.0)
-    eigVals, eigVec = ssp.eigs(R, k=1, sigma=1)
-    axis = np.array([eigVec[0,0],eigVec[1,0],eigVec[2,0]])
-    q = axang2quat(axis*angle)
-    q = q/np.linalg.norm(q,axis=0)
-    return  q
-
-
-def eul2axang(roll,pitch,yaw):
-    R = eul2rot(roll,pitch,yaw)
-    angle = np.arccos((np.trace(R) - 1)/2.0)
-    axis = veemap(R-np.transpose(R)/(2.0*np.sin(angle)))
-    return axis*angle
-
-
-def quat2eul(q):
-    R = quat2rot(q)
-    return rot2eul(R.real)
-
-
-def eul2rot(roll,pitch,yaw):
-    phi   = roll
-    theta = pitch
-    psi   = yaw
-    # Rz(yaw)Ry(pitch)Rx(roll)
-    R = np.array([[np.multiply(np.cos(psi),np.cos(theta)) - np.multiply(np.multiply(np.sin(phi),np.sin(psi)),np.sin(theta)), -np.multiply(np.cos(phi),np.sin(psi)), np.multiply(np.cos(psi),np.sin(theta)) + np.multiply(np.multiply(np.cos(theta),np.sin(phi)),np.sin(psi))],
-         [np.multiply(np.cos(theta),np.sin(psi)) + np.multiply(np.multiply(np.cos(psi),np.sin(phi)),np.sin(theta)),  np.multiply(np.cos(phi),np.cos(psi)), np.multiply(np.sin(psi),np.sin(theta)) - np.multiply(np.multiply(np.cos(psi),np.cos(theta)),np.sin(phi))],
-         [-np.multiply(np.cos(phi),np.sin(theta)), np.sin(phi), np.multiply(np.cos(phi),np.cos(theta))]])
-    return R
-
-
-def rot2eul(R):
-    if R[2,1] < 1:
-        if R[2,1] > -1:
-            roll = np.arcsin(R[2,1])
-            yaw = np.arctan2(-R[0,1], R[1,1])
-            pitch = np.arctan2(-R[2,0], R[2,2]);
-        else: # R(3,2) == -1
-            roll = -np.pi/2.0
-            yaw = -np.arctan2(R[0,2],R[0,0])
-            pitch = 0
-    else: # R(3,2) == +1
-        roll = np.pi/2.0
-        yaw = np.arctan2(R[0,2],R[0,0])
-        pitch = 0
-    return roll, pitch, yaw
 
 
 def axang2quat(w,t=None, normalize=False):
@@ -183,6 +119,86 @@ def quat2axang(q):
     return axis*angle
 
 
+def quat2rot(q):
+    u0 = q[0]
+    u = q[1::]
+    R = (u0**2 - np.inner(np.transpose(u),u))*np.eye(3) + 2.0*u0*veemap(u) + 2.0*np.outer(u,np.transpose(u))
+    return R
+
+
+def rot2eul(R):
+    if R[2,1] < 1:
+        if R[2,1] > -1:
+            roll = np.arcsin(R[2,1])
+            yaw = np.arctan2(-R[0,1], R[1,1])
+            pitch = np.arctan2(-R[2,0], R[2,2]);
+        else: # R(3,2) == -1
+            roll = -np.pi/2.0
+            yaw = -np.arctan2(R[0,2],R[0,0])
+            pitch = 0
+    else: # R(3,2) == +1
+        roll = np.pi/2.0
+        yaw = np.arctan2(R[0,2],R[0,0])
+        pitch = 0
+    return roll, pitch, yaw
+
+
+def rotationMatrixToEulerAngles(R) :
+    assert(isRotationMatrix(R))
+    sy = np.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+    if  not singular :
+        x = np.arctan2(R[2,1] , R[2,2])
+        y = np.arctan2(-R[2,0], sy)
+        z = np.arctan2(R[1,0], R[0,0])
+    else :
+        x = np.arctan2(-R[1,2], R[1,1])
+        y = np.arctan2(-R[2,0], sy)
+        z = 0
+    return x,y,z
+
+
+def isRotationMatrix(R) :
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+
+
+def quat2eul(q):
+    R = quat2rot(q)
+    return rot2eul(R)
+    # return rotationMatrixToEulerAngles(R)
+
+
+def rot2quat(R):
+    angle = np.arccos((np.trace(R) - 1)/2.0)
+    eigVals, eigVec = ssp.eigs(R, k=1, sigma=1)
+    axis = np.array([eigVec[0,0],eigVec[1,0],eigVec[2,0]])
+    q = axang2quat(axis*angle)
+    q = q/np.linalg.norm(q,axis=0)
+    return  q
+
+
+def eul2axang(roll,pitch,yaw):
+    R = eul2rot(roll,pitch,yaw)
+    angle = np.arccos((np.trace(R) - 1)/2.0)
+    axis = veemap(R-np.transpose(R)/(2.0*np.sin(angle)))
+    return axis*angle
+
+
+def eul2rot(roll,pitch,yaw):
+    phi   = roll
+    theta = pitch
+    psi   = yaw
+    # Rz(yaw)Ry(pitch)Rx(roll)
+    R = np.array([[np.multiply(np.cos(psi),np.cos(theta)) - np.multiply(np.multiply(np.sin(phi),np.sin(psi)),np.sin(theta)), -np.multiply(np.cos(phi),np.sin(psi)), np.multiply(np.cos(psi),np.sin(theta)) + np.multiply(np.multiply(np.cos(theta),np.sin(phi)),np.sin(psi))],
+         [np.multiply(np.cos(theta),np.sin(psi)) + np.multiply(np.multiply(np.cos(psi),np.sin(phi)),np.sin(theta)),  np.multiply(np.cos(phi),np.cos(psi)), np.multiply(np.sin(psi),np.sin(theta)) - np.multiply(np.multiply(np.cos(psi),np.cos(theta)),np.sin(phi))],
+         [-np.multiply(np.cos(phi),np.sin(theta)), np.sin(phi), np.multiply(np.cos(phi),np.cos(theta))]])
+    return R
+
+
 def veemap(x):
     if x.size <= 3:
         return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
@@ -192,27 +208,24 @@ def veemap(x):
 
 if __name__ == "__main__":
     q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
-    q2 = np.array([0.5**0.5, 0, 0.5**0.5, 0])
-    print(10**-2)
-    # print(q2[0,:])
-    # r = quat2rot(q2)
-    # q = rot2quat(r)
-    # print(r)
-    # print(q1)
-    # print(q2)
-    # print(q)
-    # roll,pitch,yaw = rot2eul(r)
-    # r2 = eul2rot(roll,pitch,yaw)
-    # Q = np.arange(4).reshape(2,2)
-    # print(Q)
-    # P = np.dot(Q,np.transpose(Q))
-    # print(P)
+    q2 = np.array([0.5**0.5, 0, 0, 0.5**0.5])
 
-    # q1 = np.array([1,0,0,1])
-    # q2 = np.array([[0,1,0,0],[1,0,0,0],[0,0,1,1]])
-    # print(q1)
-    # print(q2)
-    # print(q1*q2)
-    # a = np.array([0,2.0,0,2],[])
-    # a[a==0] = 1
-    # print(a)
+    qi = np.zeros([4,12])
+    qi[:,0] = np.array([ 0.865918, 0.2939987, 0.3276866, 0.2374283  ])
+    qi[:,1] = np.array([ 0.8571044,0.3052557, 0.3172266, 0.2675038 ])
+    qi[:,2] = np.array([ 0.8641028,0.3039343, 0.3015601, 0.2645975  ])
+    qi[:,3] = np.array([ 0.8498449,0.3064842, 0.3327965, 0.2703286 ])
+    qi[:,4] = np.array([ 0.8550644,0.2916056, 0.3374637, 0.2644793 ])
+    qi[:,5] = np.array([ 0.8443666,0.3212693, 0.3280279, 0.2760955 ])
+    qi[:,6] = np.array([ 0.8586668,0.3189687, 0.2968963, 0.2698201 ])
+    qi[:,7] = np.array([ 0.8675603,0.3084128, 0.3078473, 0.2396887])
+    qi[:,8] = np.array([ 0.8709171,0.2788416, 0.3317804, 0.2316732])
+    qi[:,9] = np.array([ 0.8692756,0.2888073, 0.306132, 0.2592942])
+    qi[:,10] = np.array([ 0.8637737,0.2796507, 0.347435, 0.2344769 ])
+    qi[:,11] = np.array([ 0.8534878,0.3096256, 0.3390402, 0.2464594 ])
+    qbar = np.array([0.360125,0.557931,-0.55474,-0.501302])
+    
+    # R = quat2rot(q2)
+    # roll, pitch, yaw = rot2eul(R)
+    # print(R)
+    # print(roll,pitch,yaw)
