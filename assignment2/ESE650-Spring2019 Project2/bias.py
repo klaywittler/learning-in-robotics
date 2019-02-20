@@ -10,13 +10,13 @@ def calibrate(ts,vals,sensor):
     if sensor == 'accelerometer':
         # bias = np.transpose(np.array([[510.80714286,500.99428571,605.15857143]]))
         bias = np.transpose(np.array([[510.80714286,500.99428571,505.15857143]]))
-        sensitivity = -33.0
-        factor = 3300/1023/sensitivity
+        sensitivity = 33.0 # -33.0
+        factor = 3300.0/1023.0/sensitivity
     elif sensor == 'gyro':
         bias =  np.transpose(np.array([[373.74337241,375.59278629,370.04075744]]))
         # bias =  np.transpose(np.array([[369.68571429,373.57142857,375.37285714]]))
         sensitivity = 218.0 
-        factor = 3300/1023/sensitivity
+        factor = 3300.0/1023.0/sensitivity
     else:
         return 'error'
 
@@ -45,7 +45,7 @@ def gyro(gyroVals,t):
     return Droll,Dpitch,Dyaw 
 
 
-def plot(valsE=None,valsR=None):
+def plot(valsE,valsR):
     fig, axs = plt.subplots(3, 1)
     axs[0].plot(valsE[0])
     axs[0].plot(valsR[0]) 
@@ -69,9 +69,10 @@ def plot(valsE=None,valsR=None):
 
 
 if __name__ == "__main__":
-    data_num = 1
+    data_num = 3
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
+    # accelVals = np.array([imu['vals'][0,:],imu['vals'][1,:],imu['vals'][2,:]])
     accelVals = imu['vals'][0:3,0:5545]
     gyroVals = np.array([imu['vals'][4,0:5545],imu['vals'][5,0:5545],imu['vals'][3,0:5545]])
     tsI = imu['ts'][0,0:5545]
@@ -89,7 +90,7 @@ if __name__ == "__main__":
 
     # g = np.tile(np.array([[0],[0],[-9.80665]]),len(viconRot[0,0,:]))
     # a = np.dot(viconRot[:,:,0],g[:,0,np.newaxis])
-    g = np.array([0,0,-9.80665])
+    g = np.array([0,0,9.80665])
     a = np.zeros((len(g),len(viconRot[0,0,:])))
     for i in range(len(viconRot[0,0,:])):
         a[:,i] = np.dot(viconRot[:,:,i],g)
@@ -97,12 +98,13 @@ if __name__ == "__main__":
     accelVals = calibrate(tsI,accelVals,'accelerometer')
     gyroVals = calibrate(tsI,gyroVals,'gyro')
 
-    zroll, zpitch, zyaw = accelerometer(accelVals)
+    caccelVals = np.array([accelVals[0,:],accelVals[1,:],accelVals[2,:]])
+    # zroll, zpitch, zyaw = accelerometer(accelVals)
     Droll,Dpitch,Dyaw = gyro(gyroVals,dtI)
     
-    # dr2r = vroll[0] + np.cumsum(Droll)
-    # dp2p = vpitch[0] + np.cumsum(Dpitch)
-    # dy2y = vyaw[0] + np.cumsum(Dyaw)
-    # plot([dr2r, dp2p, dy2y],[vroll,vpitch,vyaw])
+    dr2r = vroll[0] + np.cumsum(Droll)
+    dp2p = vpitch[0] + np.cumsum(Dpitch)
+    dy2y = vyaw[0] + np.cumsum(Dyaw)
+    plot([dr2r, dp2p, dy2y],[vroll,vpitch,vyaw])
     # plot([zroll,zpitch,zyaw],[vroll,vpitch,vyaw])
-    # plot(accelVals,a)
+    plot(caccelVals,a)

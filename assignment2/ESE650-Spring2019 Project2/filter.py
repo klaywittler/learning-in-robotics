@@ -4,52 +4,76 @@ import scipy.linalg as sp
 
 
 def UKF(dt,x,P,Q,z,R):
+    nrm = False
     xq = x[0:4]
     xw = x[4::]
-    dq = axang2quat(xw,dt,normalize=True)
+    dq = axang2quat(xw,dt,normalize=nrm)
     n = len(P[0,:])
 
     # getting sigma points
-    S = sp.cholesky(2*n*(P+Q))
+    S = sp.cholesky(0.01*n*(P+Q))
     Sq = S[0:3,:]
     Sw = S[3::,:]
-    Wq = axang2quat(Sq,normalize=True)
-    Wq = np.concatenate((Wq,-Wq),axis=1)
+    Sq = np.concatenate((Sq,-Sq),axis=1)
+    Wq = axang2quat(Sq,normalize=nrm)
     Ww = np.concatenate((Sw,-Sw),axis=1)
-    Xq = quatMult(xq,Wq,normalize=True)
-    Xw = xw[:,np.newaxis] + Ww
+    Xq = quatMult(xq,Wq,normalize=nrm)
 
     # projecting forward sigma points and recharacterizing distribution
-    Yq = quatMult(Xq,dq,normalize=True)
-    Yw = np.copy(Xw)
-    Xq_k = quat2axang(Yq)
-    xq_k = np.mean(Xq_k,axis=1)
-    W_k = Xq_k - xq_k[:,np.newaxis]
+    Yq = quatMult(Xq,dq,normalize=nrm)
+    Yw = xw[:,np.newaxis] + Ww
+    xq_k, xeVec = quatMean(Yq,xq)
     xw_k = np.mean(Yw,axis=1)
-    W_k = np.concatenate((W_k,Yw-xw_k[:,np.newaxis]),axis=0)
+    W_k = np.concatenate((xeVec,Ww),axis=0)
     P_k = np.dot(W_k,np.transpose(W_k))/(2.0*n)
-    x_k = np.concatenate((xq_k,xw_k),axis=0)
 
     # expected measurement characterization
-    g = np.array([0,0,0,-9.80665])
+    g = np.array([0,0,0,9.80665])
     Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
-    Zq_k = quat2axang(Zq)
+    Zq_k = Zq[1::,:]
+    # print(Zq_k)
     zq_k = np.mean(Zq_k,axis=1)
-    Z_k = np.concatenate((Zq_k,Yw),axis=0)
+    # print(zq_k)
+    # print(np.linalg.norm(zq_k,axis=0))
+    Z_k = np.concatenate((Zq_k-zq_k[:,np.newaxis],Ww),axis=0)
     z_k = np.concatenate((zq_k,xw_k),axis=0)
-    v = z - z_k
 
-    # Filter update
-    Pzz = np.dot(Z_k-z_k[:,np.newaxis],np.transpose(Z_k-z_k[:,np.newaxis]))/(2.0*n)
+    v = z - z_k
+    # print(np.linalg.norm(Zq,axis=0))
+    # print(np.linalg.norm((quat2axang(zq_k))))
+    
+    # Covariance update
+    Pzz = np.dot(Z_k,np.transpose(Z_k))/(2.0*n)
     Pvv = Pzz + R
-    Pxz = np.dot(W_k,np.transpose(Z_k-z_k[:,np.newaxis]))/(2.0*n)
+    Pxz = np.dot(W_k,np.transpose(Z_k))/(2.0*n)
+
+    #Kalman gain update
     K = np.matmul(Pxz,np.linalg.inv(Pvv))
-    xk = x_k + np.dot(K,v)
+    Kp = np.dot(K,v)
+    Kq = axang2quat(Kp[0:3])
+    xkq = quatMult(xq_k,Kq, normalize=nrm)
+    xkw = xw_k + Kp[3::]
     Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))
-    xkq = axang2quat(xk[0:3],normalize=True)
-    xk = np.concatenate((xkq,xk[3::]))
+    xk = np.concatenate((xkq,xkw))
 
     return xk,Pk
+
+
+def quatMean(Yq,xq,normalize=False):
+    qBar = quatCong(xq)
+    error = 1.0
+    count = 0
+    while error >= 10**-2:
+        Eq = quatMult(Yq,qBar,normalize=normalize)
+        eVec = quat2axang(Eq)
+        eMean = np.mean(eVec, axis=1)
+        error = np.linalg.norm(eMean,axis=0)
+        eq = axang2quat(eMean)
+        qBar = quatMult(eq,qBar,normalize=normalize)
+        count += 1
+        if count >= 100:
+            break
+    return qBar, eVec
 
 
 def quatMult(q1,q2, normalize=False):
@@ -74,7 +98,7 @@ def quatCong(q):
 def quat2rot(q):
     u0 = q[0]
     u = q[1::]
-    R = (u0**2 - np.inner(np.transpose(u),u))*np.eye(3) + 2*u0*veemap(u) + 2*np.outer(u,np.transpose(u))
+    R = (u0**2 - np.inner(np.transpose(u),u))*np.eye(3) + 2.0*u0*veemap(u) + 2.0*np.outer(u,np.transpose(u))
     return R
 
 
@@ -145,8 +169,6 @@ def axang2quat(w,t=None, normalize=False):
     else:
         angle = np.multiply(np.linalg.norm(w),t)
         a = np.linalg.norm(w,axis=0)
-        # print(a)
-        # a[a==0.0] = 1.0
         axis = np.divide(w,a)  
     u = np.sin(angle/2.0)*axis
     q = np.array([np.cos(angle/2.0),u[0],u[1],u[2]])
@@ -157,7 +179,7 @@ def axang2quat(w,t=None, normalize=False):
 
 def quat2axang(q):
     angle = 2.0*np.arccos(q[0])
-    axis = q[1::]/np.sqrt(1-q[0]**2)
+    axis = q[1::]/np.sqrt(1-np.power(q[0],2))
     return axis*angle
 
 
@@ -171,15 +193,14 @@ def veemap(x):
 if __name__ == "__main__":
     q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
     q2 = np.array([0.5**0.5, 0, 0.5**0.5, 0])
-    q = quatMult(q1,q1)
-
+    print(10**-2)
     # print(q2[0,:])
     # r = quat2rot(q2)
     # q = rot2quat(r)
     # print(r)
-    print(q1)
-    print(q2)
-    print(q)
+    # print(q1)
+    # print(q2)
+    # print(q)
     # roll,pitch,yaw = rot2eul(r)
     # r2 = eul2rot(roll,pitch,yaw)
     # Q = np.arange(4).reshape(2,2)

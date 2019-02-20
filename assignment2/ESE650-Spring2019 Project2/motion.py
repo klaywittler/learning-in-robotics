@@ -64,6 +64,11 @@ def UKF(dt,x,P,Q,z,R):
     return xk,Pk
 
 
+def quatMean(Xq,Xw,xq):
+    x = 0
+
+
+
 def quatMult(q1,q2, normalize=False):
     u0 = q1[0]
     v0 = q2[0]
@@ -186,7 +191,7 @@ if __name__ == "__main__":
     # q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
     q2 = np.array([0.5**0.5, 0, 0.5**0.5, 0])
     # q = quatMult(q1,q2)
-
+    print(1*10**-2)
     # print(q2[0,:])
     r = quat2rot(q2)
     q = rot2quat(r)
