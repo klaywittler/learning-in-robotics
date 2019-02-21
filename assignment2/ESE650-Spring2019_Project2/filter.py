@@ -55,7 +55,7 @@ def quatMean(Yq,xq,normalize=False):
     qBar = quatCong(xq)
     error = 1.0
     count = 0
-    while error >= 10**-1:
+    while error >= 10**-2:
         Eq = quatMult(Yq,qBar,normalize=normalize)
         eVec = quat2axang(Eq)
         eMean = np.mean(eVec, axis=1)
@@ -63,7 +63,7 @@ def quatMean(Yq,xq,normalize=False):
         eq = axang2quat(eMean)
         qBar = quatMult(eq,qBar,normalize=normalize)
         count += 1
-        if count >= 50:
+        if count >= 100:
             break
     return qBar, eVec
 
@@ -84,28 +84,18 @@ def quatCong(q):
         p = np.array([[1.0],[-1.0],[-1.0],[-1.0]])
     else:
         p = np.array([1.0,-1.0,-1.0,-1.0])
-    return np.multiply(q,p)
+    return q*p
 
 
 def axang2quat(w,t=None, normalize=False):
     if t is None: 
-        if w.size > 3:
-            angle = np.linalg.norm(w,axis=0)
-            a = np.copy(angle)
-            a[a==0] = 1.0
-            axis = w/a
-            u = np.multiply(np.sin(angle/2.0),axis)
-            q = np.array([np.cos(angle/2.0),u[0,:],u[1,:],u[2,:]])
-            if normalize:
-                q = q/np.linalg.norm(q,axis=0)
-            return q
-        else:
-            angle = np.linalg.norm(w)
-            axis = w/angle
+        angle = np.linalg.norm(w,axis=0)
+        a = np.copy(angle)
+        a[a==0] = 1.0
     else:
         angle = np.multiply(np.linalg.norm(w),t)
-        a = np.linalg.norm(w,axis=0)
-        axis = np.divide(w,a)  
+        a = np.linalg.norm(w,axis=0)     
+    axis = w/a 
     u = np.sin(angle/2.0)*axis
     q = np.array([np.cos(angle/2.0),u[0],u[1],u[2]])
     if normalize:
@@ -130,15 +120,15 @@ def rot2eul(R):
     if R[2,1] < 1:
         if R[2,1] > -1:
             roll = np.arcsin(R[2,1])
-            yaw = np.arctan2(-R[0,1], R[1,1])
-            pitch = np.arctan2(-R[2,0], R[2,2]);
+            yaw = np.arctan(-R[0,1]/R[1,1])
+            pitch = np.arctan2(-R[2,0],R[2,2])
         else: # R(3,2) == -1
             roll = -np.pi/2.0
-            yaw = -np.arctan2(R[0,2],R[0,0])
+            yaw = -np.arctan(R[0,2]/R[0,0])
             pitch = 0
     else: # R(3,2) == +1
         roll = np.pi/2.0
-        yaw = np.arctan2(R[0,2],R[0,0])
+        yaw = np.arctan(R[0,2]/R[0,0])
         pitch = 0
     return roll, pitch, yaw
 
@@ -150,7 +140,7 @@ def rotationMatrixToEulerAngles(R) :
     if  not singular :
         x = np.arctan2(R[2,1] , R[2,2])
         y = np.arctan2(-R[2,0], sy)
-        z = np.arctan2(R[1,0], R[0,0])
+        z = np.arctan(R[1,0]/R[0,0])
     else :
         x = np.arctan2(-R[1,2], R[1,1])
         y = np.arctan2(-R[2,0], sy)
@@ -206,25 +196,30 @@ def veemap(x):
         return np.array([x[1,2], x[0,2],x[1,0]])    
 
 
-if __name__ == "__main__":
-    q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
-    q2 = np.array([0.5**0.5, 0, 0, 0.5**0.5])
+# if __name__ == "__main__":
+    # q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
+    # q2 = np.array([0.5**0.5, 0, 0, 0.5**0.5])
 
-    qi = np.zeros([4,12])
-    qi[:,0] = np.array([ 0.865918, 0.2939987, 0.3276866, 0.2374283  ])
-    qi[:,1] = np.array([ 0.8571044,0.3052557, 0.3172266, 0.2675038 ])
-    qi[:,2] = np.array([ 0.8641028,0.3039343, 0.3015601, 0.2645975  ])
-    qi[:,3] = np.array([ 0.8498449,0.3064842, 0.3327965, 0.2703286 ])
-    qi[:,4] = np.array([ 0.8550644,0.2916056, 0.3374637, 0.2644793 ])
-    qi[:,5] = np.array([ 0.8443666,0.3212693, 0.3280279, 0.2760955 ])
-    qi[:,6] = np.array([ 0.8586668,0.3189687, 0.2968963, 0.2698201 ])
-    qi[:,7] = np.array([ 0.8675603,0.3084128, 0.3078473, 0.2396887])
-    qi[:,8] = np.array([ 0.8709171,0.2788416, 0.3317804, 0.2316732])
-    qi[:,9] = np.array([ 0.8692756,0.2888073, 0.306132, 0.2592942])
-    qi[:,10] = np.array([ 0.8637737,0.2796507, 0.347435, 0.2344769 ])
-    qi[:,11] = np.array([ 0.8534878,0.3096256, 0.3390402, 0.2464594 ])
-    qbar = np.array([0.360125,0.557931,-0.55474,-0.501302])
+
+    # qi = np.zeros([4,12])
+    # qi[:,0] = np.array([ 0.865918, 0.2939987, 0.3276866, 0.2374283  ])
+    # qi[:,1] = np.array([ 0.8571044,0.3052557, 0.3172266, 0.2675038 ])
+    # qi[:,2] = np.array([ 0.8641028,0.3039343, 0.3015601, 0.2645975  ])
+    # qi[:,3] = np.array([ 0.8498449,0.3064842, 0.3327965, 0.2703286 ])
+    # qi[:,4] = np.array([ 0.8550644,0.2916056, 0.3374637, 0.2644793 ])
+    # qi[:,5] = np.array([ 0.8443666,0.3212693, 0.3280279, 0.2760955 ])
+    # qi[:,6] = np.array([ 0.8586668,0.3189687, 0.2968963, 0.2698201 ])
+    # qi[:,7] = np.array([ 0.8675603,0.3084128, 0.3078473, 0.2396887])
+    # qi[:,8] = np.array([ 0.8709171,0.2788416, 0.3317804, 0.2316732])
+    # qi[:,9] = np.array([ 0.8692756,0.2888073, 0.306132, 0.2592942])
+    # qi[:,10] = np.array([ 0.8637737,0.2796507, 0.347435, 0.2344769 ])
+    # qi[:,11] = np.array([ 0.8534878,0.3096256, 0.3390402, 0.2464594 ])
+    # qbar = np.array([0.360125,0.557931,-0.55474,-0.501302])
     
+    # xq, e = quatMean(qi,qbar)
+    # print(e)
+
+
     # R = quat2rot(q2)
     # roll, pitch, yaw = rot2eul(R)
     # print(R)

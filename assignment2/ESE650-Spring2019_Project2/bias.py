@@ -8,24 +8,25 @@ from filter import *
 def calibrate(vals,sensor,calibrate=False,iteration=700):
     if calibrate:
         bias = np.transpose(np.array([np.average(vals[:, 0:iteration],axis=1)]))
-        sensitivity = 218.0
+        if sensor == 'accelerometer':
+            sensitivity = 33.0
+        elif sensor == 'gyro':
+            sensitivity = 218.0
         print(bias)
-        factor = 3300.0/1023.0/sensitivity
-        scale = np.transpose(np.array([[factor,factor,factor]]))
     else:
         if sensor == 'accelerometer':
             # bias = np.transpose(np.array([[510.80714286,500.99428571,605.15857143]]))
             bias = np.transpose(np.array([[510.80714286,500.99428571,505.15857143]]))
-            sensitivity = 33.0 # -33.0
-            factor = 3300.0/1023.0/sensitivity
+            sensitivity = 33.0 # 33.0
         elif sensor == 'gyro':
             # bias =  np.transpose(np.array([[373.74337241,375.59278629,370.04075744]]))
             bias =  np.transpose(np.array([[373.57142857,375.37285714,369.68571429]]))
             sensitivity = 218.0 
-            factor = 3300.0/1023.0/sensitivity
         else:
             return 'error'
 
+    factor = 3300.0/1023.0/sensitivity
+    scale = np.transpose(np.array([[factor,factor,factor]]))
     corrected = (vals - bias)*factor
     return corrected
 
@@ -52,6 +53,7 @@ def gyro(gyroVals,t):
 
 
 def plot(valsE,valsR):
+    plt.close('all')
     fig, axs = plt.subplots(3, 1)
     axs[0].plot(valsE[0])
     axs[0].plot(valsR[0]) 
@@ -75,19 +77,37 @@ def plot(valsE,valsR):
 
 
 if __name__ == "__main__":
-    data_num = 1
+    data_num = 2
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
-    # accelVals = np.array([imu['vals'][0,:],imu['vals'][1,:],imu['vals'][2,:]])
-    accelVals = imu['vals'][0:3,0:5545]
-    gyroVals = np.array([imu['vals'][4,0:5545],imu['vals'][5,0:5545],imu['vals'][3,0:5545]])
-    tsI = imu['ts'][0,0:5545]
-    dtI = tsI - tsI[0]
 
     viconFile = 'vicon/viconRot' + str(data_num) + '.mat'
     vicon = sio.loadmat(viconFile)
-    viconRot = vicon['rots'][:,:,16::]
-    tsV = vicon['ts'][0,16::]
+
+    if data_num==1:
+        viconRot = vicon['rots'][:,:,16::] # dataset number 1
+        s = 0
+        e = 5545
+        m = 0
+    elif data_num==2:
+        viconRot = vicon['rots'] # dataset number 2
+        s = 51
+        e = -47
+        m = 51
+    elif data_num==3:
+        viconRot = vicon['rots'][:,:,0:-64] # dataset number 3
+        s = 35
+        e = None
+        m = 34
+
+
+    # accelVals = np.array([imu['vals'][0,:],imu['vals'][1,:],imu['vals'][2,:]])
+    accelVals = imu['vals'][0:3,0:5545]
+    gyroVals = np.array([imu['vals'][4,s:e],imu['vals'][5,s:e],imu['vals'][3,s:e]])
+    tsI = imu['ts'][0,s:e]
+    dtI = tsI - tsI[0]
+
+
     vroll = np.zeros(len(viconRot[0,0,:]))
     vpitch = np.zeros(len(viconRot[0,0,:]))
     vyaw = np.zeros(len(viconRot[0,0,:]))
@@ -102,14 +122,14 @@ if __name__ == "__main__":
         a[:,i] = np.dot(viconRot[:,:,i],g)
 
     accelVals = calibrate(accelVals,'accelerometer')
-    gyroVals = calibrate(gyroVals,'gyro',calibrate=True)
+    gyroVals = calibrate(gyroVals,'gyro',calibrate=False)
 
     # zroll, zpitch, zyaw = accelerometer(accelVals)
+    # plot([zroll,zpitch,zyaw],[vroll,vpitch,vyaw])
     Droll,Dpitch,Dyaw = gyro(gyroVals,dtI)
     
     dr2r = vroll[0] + np.cumsum(Droll)
     dp2p = vpitch[0] + np.cumsum(Dpitch)
     dy2y = vyaw[0] + np.cumsum(Dyaw)
     plot([dr2r, dp2p, dy2y],[vroll,vpitch,vyaw])
-    # plot([zroll,zpitch,zyaw],[vroll,vpitch,vyaw])
     plot(accelVals,a)
