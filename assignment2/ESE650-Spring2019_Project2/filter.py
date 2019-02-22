@@ -1,16 +1,56 @@
 import numpy as np
 import scipy.sparse.linalg as ssp
 import scipy.linalg as sp
+from quatAvg import *
+
+
+def UKF4(dt,x,u,P,Q,z,R):
+    nrm = True
+    dq = axang2quat(u*dt,normalize=nrm)
+    n = len(P[0,:])
+
+    # getting sigma points
+    S = sp.cholesky(2.0*n*(P+Q))
+    Sq = np.concatenate((S,-S),axis=1)
+    Wq = axang2quat(Sq,normalize=nrm)
+    Xq = quatMult(x,Wq,normalize=nrm)
+
+    # projecting forward sigma points and recharacterizing distribution
+    Yq = quatMult(Xq,dq,normalize=nrm)
+    xq_k, xeVec = quat_average(Yq,x)
+    P_k = np.dot(xeVec,np.transpose(xeVec))/(2.0*n)
+
+    # expected measurement characterization
+    g = np.array([0,0,0,9.80665])
+    Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
+    Zq_k = Zq[1::,:]
+    zq_k = np.mean(Zq_k,axis=1)
+    Z_k = Zq_k-zq_k[:,np.newaxis]
+    v = z - zq_k
+
+    # Covariance update
+    Pzz = np.dot(Z_k,np.transpose(Z_k))/(2.0*n)
+    Pvv = Pzz + R
+    Pxz = np.dot(xeVec,np.transpose(Z_k))/(2.0*n)
+
+    #Kalman gain update
+    K = np.matmul(Pxz,np.linalg.inv(Pvv))
+    Kp = np.dot(K,v)
+    Kq = axang2quat(Kp)
+    xk = quatMult(xq_k,Kq, normalize=nrm)
+    Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))    
+    return xk,Pk
+
 
 def UKF(dt,x,P,Q,z,R):
-    nrm = False
+    nrm = True
     xq = x[0:4]
     xw = x[4::]
     dq = axang2quat(xw,dt,normalize=nrm)
     n = len(P[0,:])
 
     # getting sigma points
-    S = sp.cholesky(0.01*n*(P+Q))
+    S = sp.cholesky(2.0*n*(P+Q))
     Sq = S[0:3,:]
     Sw = S[3::,:]
     Sq = np.concatenate((Sq,-Sq),axis=1)
@@ -27,12 +67,13 @@ def UKF(dt,x,P,Q,z,R):
     P_k = np.dot(W_k,np.transpose(W_k))/(2.0*n)
 
     # expected measurement characterization
+    # g = np.array([0,0,0,1.0])
     g = np.array([0,0,0,9.80665])
     Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
     Zq_k = Zq[1::,:]
     zq_k = np.mean(Zq_k,axis=1)
     Z_k = np.concatenate((Zq_k-zq_k[:,np.newaxis],Ww),axis=0)
-    z_k = np.concatenate((zq_k,xw_k),axis=0)
+    z_k = np.concatenate((zq_k,xw),axis=0)
     v = z - z_k
     
     # Covariance update
@@ -45,7 +86,7 @@ def UKF(dt,x,P,Q,z,R):
     Kp = np.dot(K,v)
     Kq = axang2quat(Kp[0:3])
     xkq = quatMult(xq_k,Kq, normalize=nrm)
-    xkw = xw_k + Kp[3::]
+    xkw = xw + Kp[3::]
     Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))
     xk = np.concatenate((xkq,xkw))
     return xk,Pk
@@ -53,10 +94,12 @@ def UKF(dt,x,P,Q,z,R):
 
 def quatMean(Yq,xq,normalize=False):
     qBar = quatCong(xq)
+    # print('qbar')
+    # print(qBar)
     error = 1.0
     count = 0
-    while error >= 10**-2:
-        Eq = quatMult(Yq,qBar,normalize=normalize)
+    while error >= 10**-3:
+        Eq = quatMult(qBar,Yq,normalize=normalize)
         eVec = quat2axang(Eq)
         eMean = np.mean(eVec, axis=1)
         error = np.linalg.norm(eMean,axis=0)
@@ -105,7 +148,8 @@ def axang2quat(w,t=None, normalize=False):
 
 def quat2axang(q):
     angle = 2.0*np.arccos(q[0])
-    axis = q[1::]/np.sqrt(1-np.power(q[0],2))
+    # axis = q[1::]/np.sqrt(1-np.power(q[0],2))
+    axis = q[1::]/np.linalg.norm(q[1::],axis=0)
     return axis*angle
 
 
@@ -120,15 +164,15 @@ def rot2eul(R):
     if R[2,1] < 1:
         if R[2,1] > -1:
             roll = np.arcsin(R[2,1])
-            yaw = np.arctan(-R[0,1]/R[1,1])
+            yaw = np.arctan2(-R[0,1],R[1,1])
             pitch = np.arctan2(-R[2,0],R[2,2])
         else: # R(3,2) == -1
             roll = -np.pi/2.0
-            yaw = -np.arctan(R[0,2]/R[0,0])
+            yaw = -np.arctan2(R[0,2],R[0,0])
             pitch = 0
     else: # R(3,2) == +1
         roll = np.pi/2.0
-        yaw = np.arctan(R[0,2]/R[0,0])
+        yaw = np.arctan2(R[0,2],R[0,0])
         pitch = 0
     return roll, pitch, yaw
 
@@ -158,8 +202,8 @@ def isRotationMatrix(R) :
 
 def quat2eul(q):
     R = quat2rot(q)
-    return rot2eul(R)
-    # return rotationMatrixToEulerAngles(R)
+    # return rot2eul(R)
+    return rotationMatrixToEulerAngles(R)
 
 
 def rot2quat(R):
@@ -194,6 +238,43 @@ def veemap(x):
         return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
     else:
         return np.array([x[1,2], x[0,2],x[1,0]])    
+
+
+def quat_average(q,q0):
+    q = np.matrix(q)
+    qt = q0
+    nr, nc = np.shape(q)
+    qe = np.matrix(np.zeros([nr, 4]))
+    ev = np.matrix(np.zeros([nr, 3]))
+    pi = 22.0/7
+    epsilon = 0.0001
+    temp = np.zeros([1,4])
+    for t in range(1000):
+        for i in range(0,nr,1):
+            qe[i] = multiply_quaternions(q[i].T,quatCong(qt))
+            qs = qe[i,0]
+            qv = qe[i,1:4]
+            if np.round(norm_quaternion(qv),8) == 0:
+                if np.round(norm_quaternion(qe[i]),8) == 0:
+                    ev[i] = np.matrix([0, 0, 0])
+                else:
+                    ev[i] = np.matrix([0, 0, 0])
+            if np.round(norm_quaternion(qv),8) != 0:
+                if np.round(norm_quaternion(qe[i]),8) == 0:
+                    ev[i] = np.matrix([0, 0, 0])
+                else:
+                    temp[0,0] = np.log(norm_quaternion(qe[i]))
+                    temp[0,1:4] = np.dot((qv/norm_quaternion(qv)),math.acos(qs/norm_quaternion(qe[i])))
+                    ev[i] = 2*temp[0,1:4]
+                    ev[i] = ((-np.pi + (np.mod((norm_quaternion(ev[i]) + np.pi),(2*np.pi))))/norm_quaternion(ev[i]))*ev[i]
+        e = np.transpose(np.mean(ev, 0))
+        temp2 = np.array(np.zeros([4,1]))
+        temp2[0] = 0
+        temp2[1:4] = e/2.0
+        qt = multiply_quaternions(exp_quaternion(np.transpose(temp2)),qt)
+
+        if norm_quaternion(e) < epsilon:
+            return qt, ev
 
 
 # if __name__ == "__main__":
