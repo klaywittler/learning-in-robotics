@@ -17,13 +17,13 @@ def calibrate(vals,sensor,calibrate=False,iteration=700):
         if sensor == 'accelerometer':
             # bias = np.transpose(np.array([[510.8436,500.9864,501.0]]))
             bias = np.transpose(np.array([[510.80714286,500.99428571,505.15857143]]))
-            sensitivity = 33.0*np.array([-1.0,-1.0,1.0]) # 33.0
+            sensitivity = 34.5*np.array([1.0,1.0,1.0]) # 33.0
             # sensitivity = np.array([330.5295,330.5295,-338.4347])
         elif sensor == 'gyro':
             # bias =  np.transpose(np.array([[376.0,376.0,381.0]]))
             bias =  np.transpose(np.array([[373.74337241,375.59278629,370.04075744]]))
-            sensitivity = 218.0*np.array([1.0,1.0,1.0]) # 218.0 
-            # sensitivity = 180/np.pi*np.array([3.5,3.5,-5.3])
+            # sensitivity = 218.0*np.array([1.0,1.0,1.0]) # 218.0 
+            sensitivity = 180/np.pi*np.array([3.8,3.8,3.8])
         else:
             return 'error'
 

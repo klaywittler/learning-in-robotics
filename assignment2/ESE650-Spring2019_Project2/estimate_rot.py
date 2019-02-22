@@ -11,7 +11,7 @@ from filter import *
 import matplotlib.pyplot as plt
 
 
-def estimate_rot(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)):
+def estimate_rot7(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -30,12 +30,12 @@ def estimate_rot(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6
 
     for i in range(len(dt)): #  len(dt)
         z = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x,P = UKF(dt[i],x,P,Q,z,R)
+        x,P = UKF7(dt[i],x,P,Q,z,R)
         roll[i], pitch[i], yaw[i] = quat2eul(x[0:4])
     return roll, pitch, yaw
 
 
-def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=40.0*np.eye(3), R=10.0*np.eye(3)):
+def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(3)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -51,6 +51,12 @@ def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=40.0*np.eye(3), R=10.0*np.eye(
     pitch = np.zeros(accelVals.shape[1])
     yaw = np.zeros(accelVals.shape[1])
 
+    # Q = np.diag([70,70,10])
+    # R = np.diag([85,85,25])
+    # R = 10**15*np.eye(3)
+    Q=100.0*np.eye(3)
+    R=100.0*np.eye(3)
+
     for i in range(len(dt)): 
         z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
         u4 = np.array([gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
@@ -59,7 +65,7 @@ def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=40.0*np.eye(3), R=10.0*np.eye(
     return roll, pitch, yaw
 
 
-def estimate_quat(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.eye(6)):
+def estimate_quat7(data_num=1, P=1.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -78,12 +84,12 @@ def estimate_quat(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.ey
 
     for i in range(len(dt)):
         z = np.array([-accelVals[0,i],-accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x,P = UKF(dt[i],x,P,Q,z,R)
+        x,P = UKF7(dt[i],x,P,Q,z,R)
         orient[:,i] = x[0:4]
     return orient
 
 
-def estimate_quat4(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.eye(6)):
+def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(3)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -101,9 +107,9 @@ def estimate_quat4(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.e
     orient = np.zeros((4,len(accelVals[0,:])))
 
     for i in range(len(dt)):
-        z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
+        z4 = np.array([-accelVals[0,i],-accelVals[1,i],accelVals[2,i]])
         u4 = np.array([gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x4,P = UKF4(dt[i],x,u4,P,Q,z4,R)
+        x4,P = UKF4(dt[i],x4,u4,P,Q,z4,R)
         orient[:,i] = x4
     return orient
 
@@ -141,7 +147,7 @@ if __name__ == "__main__":
     plot([r[s:e],p[s:e],y[s:e]],[vroll,vpitch,vyaw])
 
 
-    # q = estimate_quat(data_num,P,Q,R)
+    # q = estimate_quat4(data_num)
     # g = np.array([0,0,9.80665])
     # a = np.zeros((len(g),len(viconRot[0,0,:])))
     # a_estim = np.zeros((len(g),len(viconRot[0,0,:])))
