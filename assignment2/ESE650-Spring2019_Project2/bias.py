@@ -28,7 +28,6 @@ def calibrate(vals,sensor,calibrate=False,iteration=700):
             return 'error'
 
     factor = 3300.0/1023.0/sensitivity
-    # scale = np.transpose(np.array([[factor,factor,factor]]))
     corrected = (vals - bias)*factor[:,np.newaxis]
     return corrected
 
@@ -102,13 +101,10 @@ if __name__ == "__main__":
         e = None
         m = 34
 
-
-    # accelVals = np.array([imu['vals'][0,:],imu['vals'][1,:],imu['vals'][2,:]])
     accelVals = imu['vals'][0:3,0:5545]
     gyroVals = np.array([imu['vals'][4,s:e],imu['vals'][5,s:e],imu['vals'][3,s:e]])
     tsI = imu['ts'][0,s:e]
     dtI = tsI - tsI[0]
-
 
     vroll = np.zeros(len(viconRot[0,0,:]))
     vpitch = np.zeros(len(viconRot[0,0,:]))
@@ -116,8 +112,6 @@ if __name__ == "__main__":
     for i in range(len(viconRot[0,0,:])):
         vroll[i], vpitch[i], vyaw[i] = rot2eul(viconRot[:,:,i])
 
-    # g = np.tile(np.array([[0],[0],[-9.80665]]),len(viconRot[0,0,:]))
-    # a = np.dot(viconRot[:,:,0],g[:,0,np.newaxis])
     g = np.array([0,0,9.80665])
     a = np.zeros((len(g),len(viconRot[0,0,:])))
     for i in range(len(viconRot[0,0,:])):
@@ -126,12 +120,13 @@ if __name__ == "__main__":
     accelVals = calibrate(accelVals,'accelerometer')
     gyroVals = calibrate(gyroVals,'gyro')
 
-    # zroll, zpitch, zyaw = accelerometer(accelVals)
+    zroll, zpitch, zyaw = accelerometer(accelVals)
     # plot([zroll,zpitch,zyaw],[vroll,vpitch,vyaw])
+
     Droll,Dpitch,Dyaw = gyro(gyroVals,dtI)
     
     dr2r = vroll[0] + np.cumsum(Droll)
     dp2p = vpitch[0] + np.cumsum(Dpitch)
     dy2y = vyaw[0] + np.cumsum(Dyaw)
-    plot([dr2r, dp2p, dy2y],[vroll,vpitch,vyaw])
+    # plot([dr2r, dp2p, dy2y],[vroll,vpitch,vyaw])
     # plot(accelVals,a)

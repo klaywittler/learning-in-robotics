@@ -4,49 +4,11 @@ import scipy.linalg as sp
 from quatAvg import *
 
 
-def UKF4(dt,x,u,P,Q,z,R):
-    nrm = True
-    dq = axang2quat(u*dt,normalize=nrm)
-    n = len(P[0,:])
-
-    # getting sigma points
-    S = sp.cholesky(2.0*n*(P+Q))
-    Sq = np.concatenate((S,-S),axis=1)
-    Wq = axang2quat(Sq,normalize=nrm)
-    Xq = quatMult(x,Wq,normalize=nrm)
-
-    # projecting forward sigma points and recharacterizing distribution
-    Yq = quatMult(Xq,dq,normalize=nrm)
-    xq_k, xeVec = quat_average(Yq,x)
-    P_k = np.dot(xeVec,np.transpose(xeVec))/(2.0*n)
-
-    # expected measurement characterization
-    g = np.array([0,0,0,9.80665])
-    Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
-    Zq_k = Zq[1::,:]
-    zq_k = np.mean(Zq_k,axis=1)
-    Z_k = Zq_k-zq_k[:,np.newaxis]
-    v = z - zq_k
-
-    # Covariance update
-    Pzz = np.dot(Z_k,np.transpose(Z_k))/(2.0*n)
-    Pvv = Pzz + R
-    Pxz = np.dot(xeVec,np.transpose(Z_k))/(2.0*n)
-
-    #Kalman gain update
-    K = np.matmul(Pxz,np.linalg.inv(Pvv))
-    Kp = np.dot(K,v)
-    Kq = axang2quat(Kp)
-    xk = quatMult(xq_k,Kq, normalize=nrm)
-    Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))    
-    return xk,Pk
-
-
 def UKF(dt,x,P,Q,z,R):
     nrm = True
     xq = x[0:4]
     xw = x[4::]
-    dq = axang2quat(xw,dt,normalize=nrm)
+    dq = axang2quat(xw*dt,normalize=nrm)
     n = len(P[0,:])
 
     # getting sigma points
@@ -67,7 +29,6 @@ def UKF(dt,x,P,Q,z,R):
     P_k = np.dot(W_k,np.transpose(W_k))/(2.0*n)
 
     # expected measurement characterization
-    # g = np.array([0,0,0,1.0])
     g = np.array([0,0,0,9.80665])
     Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
     Zq_k = Zq[1::,:]
@@ -92,13 +53,49 @@ def UKF(dt,x,P,Q,z,R):
     return xk,Pk
 
 
+def UKF4(dt,x,u,P,Q,z,R):
+    nrm = True
+    dq = axang2quat(u*dt,normalize=nrm)
+    n = len(P[0,:])
+
+    # getting sigma points
+    S = sp.cholesky(2.0*n*(P+Q))
+    Sq = np.concatenate((S,-S),axis=1)
+    Wq = axang2quat(Sq,normalize=nrm)
+    Xq = quatMult(x,Wq,normalize=nrm)
+
+    # projecting forward sigma points and recharacterizing distribution
+    Yq = quatMult(Xq,dq,normalize=nrm)
+    xq_k, xeVec = quatMean(Yq,x)
+    P_k = np.dot(xeVec,np.transpose(xeVec))/(2.0*n)
+
+    # expected measurement characterization
+    g = np.array([0,0,0,9.80665])
+    Zq = quatMult(quatMult(Yq,g),quatCong(Yq))
+    Zq_k = Zq[1::,:]
+    zq_k = np.mean(Zq_k,axis=1)
+    Z_k = Zq_k-zq_k[:,np.newaxis]
+    v = z - zq_k
+
+    # Covariance update
+    Pzz = np.dot(Z_k,np.transpose(Z_k))/(2.0*n)
+    Pvv = Pzz + R
+    Pxz = np.dot(xeVec,np.transpose(Z_k))/(2.0*n)
+
+    #Kalman gain update
+    K = np.matmul(Pxz,np.linalg.inv(Pvv))
+    Kp = np.dot(K,v)
+    Kq = axang2quat(Kp)
+    xk = quatMult(xq_k,Kq, normalize=nrm)
+    Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))    
+    return xk,Pk
+
+
 def quatMean(Yq,xq,normalize=False):
     qBar = quatCong(xq)
-    # print('qbar')
-    # print(qBar)
     error = 1.0
     count = 0
-    while error >= 10**-3:
+    while error >= 10**-2:
         Eq = quatMult(qBar,Yq,normalize=normalize)
         eVec = quat2axang(Eq)
         eMean = np.mean(eVec, axis=1)
@@ -148,8 +145,8 @@ def axang2quat(w,t=None, normalize=False):
 
 def quat2axang(q):
     angle = 2.0*np.arccos(q[0])
-    # axis = q[1::]/np.sqrt(1-np.power(q[0],2))
-    axis = q[1::]/np.linalg.norm(q[1::],axis=0)
+    axis = q[1::]/np.sqrt(1-np.power(q[0],2))
+    # axis = q[1::]/np.linalg.norm(q[1::],axis=0)
     return axis*angle
 
 
@@ -237,47 +234,40 @@ def veemap(x):
     if x.size <= 3:
         return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
     else:
-        return np.array([x[1,2], x[0,2],x[1,0]])    
+        return np.array([x[1,2], x[0,2],x[1,0]])   
 
 
-def quat_average(q,q0):
-    q = np.matrix(q)
-    qt = q0
-    nr, nc = np.shape(q)
-    qe = np.matrix(np.zeros([nr, 4]))
-    ev = np.matrix(np.zeros([nr, 3]))
-    pi = 22.0/7
-    epsilon = 0.0001
-    temp = np.zeros([1,4])
-    for t in range(1000):
-        for i in range(0,nr,1):
-            qe[i] = multiply_quaternions(q[i].T,quatCong(qt))
-            qs = qe[i,0]
-            qv = qe[i,1:4]
-            if np.round(norm_quaternion(qv),8) == 0:
-                if np.round(norm_quaternion(qe[i]),8) == 0:
-                    ev[i] = np.matrix([0, 0, 0])
-                else:
-                    ev[i] = np.matrix([0, 0, 0])
-            if np.round(norm_quaternion(qv),8) != 0:
-                if np.round(norm_quaternion(qe[i]),8) == 0:
-                    ev[i] = np.matrix([0, 0, 0])
-                else:
-                    temp[0,0] = np.log(norm_quaternion(qe[i]))
-                    temp[0,1:4] = np.dot((qv/norm_quaternion(qv)),math.acos(qs/norm_quaternion(qe[i])))
-                    ev[i] = 2*temp[0,1:4]
-                    ev[i] = ((-np.pi + (np.mod((norm_quaternion(ev[i]) + np.pi),(2*np.pi))))/norm_quaternion(ev[i]))*ev[i]
-        e = np.transpose(np.mean(ev, 0))
-        temp2 = np.array(np.zeros([4,1]))
-        temp2[0] = 0
-        temp2[1:4] = e/2.0
-        qt = multiply_quaternions(exp_quaternion(np.transpose(temp2)),qt)
+# def quatWAvgMarkley(Q, weights):
+#     '''
+#     Averaging Quaternions.
 
-        if norm_quaternion(e) < epsilon:
-            return qt, ev
+#     Arguments:
+#         Q(ndarray): an Mx4 ndarray of quaternions.
+#         weights(list): an M elements list, a weight for each quaternion.
+#     '''
+
+#     # Form the symmetric accumulator matrix
+#     A = np.zeros((4, 4))
+#     M = Q.shape[0]
+#     wSum = 0
+
+#     for i in range(M):
+#         q = Q[i, :]
+#         w_i = weights[i]
+#         A += w_i * (np.outer(q, q)) # rank 1 update
+#         wSum += w_i
+
+#     # scale
+#     A /= wSum
+
+#     # Get the eigenvector corresponding to largest eigen value
+#     return np.linalg.eigh(A)[1][:, -1] 
 
 
 # if __name__ == "__main__":
+#     W_k = np.array([[0 ,1 ,2 ,3],[6,7,8,9],[12,13,14,15]])
+
+
     # q1 = np.array([[0.5**0.5, 1, 0,0.5**0.5 ],[0, 0, 1, 0.5**0.5],[0.5**0.5, 0, 0, 0],[0, 0, 0, 0]])
     # q2 = np.array([0.5**0.5, 0, 0, 0.5**0.5])
 
@@ -299,7 +289,6 @@ def quat_average(q,q0):
     
     # xq, e = quatMean(qi,qbar)
     # print(e)
-
 
     # R = quat2rot(q2)
     # roll, pitch, yaw = rot2eul(R)

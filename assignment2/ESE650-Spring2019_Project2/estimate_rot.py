@@ -11,7 +11,7 @@ from filter import *
 import matplotlib.pyplot as plt
 
 
-def estimate_rot(data_num=1, P=1.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)):
+def estimate_rot(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -21,16 +21,7 @@ def estimate_rot(data_num=1, P=1.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)
     accelVals = calibrate(accelVals,'accelerometer')
     gyroVals = calibrate(gyroVals,'gyro')
 
-    # x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
-    x = np.array([1.0,0,0,0])
-
-    P4 = 10.0*np.eye(3)
-    # Q4 = 1.0*np.eye(3)
-    # R4 = (10.0**15)*np.eye(3)
-    Q4 = 100.0*np.eye(3)
-    R4 = 100.0*np.eye(3)
-    # Q4 = 1.0*np.dot(np.eye(3),np.diag([60,60,15]))
-    # R4 = 1.0*np.dot(np.eye(3),np.diag([30,30,30]))
+    x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
 
     roll = np.zeros(accelVals.shape[1])
     pitch = np.zeros(accelVals.shape[1])
@@ -38,13 +29,33 @@ def estimate_rot(data_num=1, P=1.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(6)
     orient = np.zeros((4,len(accelVals[0,:])))
 
     for i in range(len(dt)): #  len(dt)
-        # z = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        # x,P = UKF(dt[i],x,P,Q,z,R)
-        # roll[i], pitch[i], yaw[i] = quat2eul(x[0:4])
+        z = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
+        x,P = UKF(dt[i],x,P,Q,z,R)
+        roll[i], pitch[i], yaw[i] = quat2eul(x[0:4])
+    return roll, pitch, yaw
+
+
+def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=40.0*np.eye(3), R=10.0*np.eye(3)):
+    file = 'imu/imuRaw' + str(data_num) + '.mat'
+    imu = sio.loadmat(file)
+    accelVals = imu['vals'][0:3,:]
+    gyroVals = np.array([imu['vals'][4,:],imu['vals'][5,:],imu['vals'][3,:]])
+    dt = imu['ts'][0,1::]-imu['ts'][0,0:-1]
+
+    accelVals = calibrate(accelVals,'accelerometer')
+    gyroVals = calibrate(gyroVals,'gyro')
+
+    x4 = np.array([1.0,0,0,0])
+
+    roll = np.zeros(accelVals.shape[1])
+    pitch = np.zeros(accelVals.shape[1])
+    yaw = np.zeros(accelVals.shape[1])
+
+    for i in range(len(dt)): 
         z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
         u4 = np.array([gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x,P = UKF4(dt[i],x,u4,P4,Q4,z4,R4)
-        roll[i], pitch[i], yaw[i] = quat2eul(x)
+        x4,P = UKF4(dt[i],x4,u4,P,Q,z4,R)
+        roll[i], pitch[i], yaw[i] = quat2eul(x4)
     return roll, pitch, yaw
 
 
@@ -58,12 +69,7 @@ def estimate_quat(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.ey
     accelVals = calibrate(accelVals,'accelerometer')
     gyroVals = calibrate(gyroVals,'gyro')
 
-    # x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
-    x = np.array([1.0,0,0,0])
-
-    P4 = 50.0*np.eye(3)
-    Q4 = 90.0*np.eye(3)
-    R4 = (10.0**15)*np.eye(3)
+    x = np.array([1.0,0,0,0,gyroVals[0,0],gyroVals[1,0],gyroVals[2,0]])
 
     roll = np.zeros(accelVals.shape[1])
     pitch = np.zeros(accelVals.shape[1])
@@ -71,13 +77,34 @@ def estimate_quat(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.ey
     orient = np.zeros((4,len(accelVals[0,:])))
 
     for i in range(len(dt)):
-        # z = np.array([-accelVals[0,i],-accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        # x,P = UKF(dt[i],x,P,Q,z,R)
-        # orient[:,i] = x[0:4]
+        z = np.array([-accelVals[0,i],-accelVals[1,i],accelVals[2,i],gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
+        x,P = UKF(dt[i],x,P,Q,z,R)
+        orient[:,i] = x[0:4]
+    return orient
+
+
+def estimate_quat4(data_num=1, P=1.0*np.eye(6), Q=0.001*np.eye(6), R=0.0001*np.eye(6)):
+    file = 'imu/imuRaw' + str(data_num) + '.mat'
+    imu = sio.loadmat(file)
+    accelVals = imu['vals'][0:3,:]
+    gyroVals = np.array([imu['vals'][4,:],imu['vals'][5,:],imu['vals'][3,:]])
+    dt = imu['ts'][0,1::]-imu['ts'][0,0:-1]
+
+    accelVals = calibrate(accelVals,'accelerometer')
+    gyroVals = calibrate(gyroVals,'gyro')
+
+    x4 = np.array([1.0,0,0,0])
+
+    roll = np.zeros(accelVals.shape[1])
+    pitch = np.zeros(accelVals.shape[1])
+    yaw = np.zeros(accelVals.shape[1])
+    orient = np.zeros((4,len(accelVals[0,:])))
+
+    for i in range(len(dt)):
         z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
         u4 = np.array([gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
-        x,P = UKF4(dt[i],x,u4,P4,Q4,z4,R4)
-        roll[i], pitch[i], yaw[i] = quat2eul(x)
+        x4,P = UKF4(dt[i],x,u4,P,Q,z4,R)
+        orient[:,i] = x4
     return orient
 
 
@@ -110,30 +137,7 @@ if __name__ == "__main__":
         vroll[i], vpitch[i], vyaw[i] = rot2eul(viconRot[:,:,i])
 
 
-    P = 50.0*np.eye(6)
-    # Q = 490.0*np.eye(6)
-    # R = 290.0*np.eye(6)
-
-
-    # Q = 90.0*np.eye(6)
-    # R = (60.0)*np.eye(6)
-
-    # Q = 4.2*90.0*np.eye(6)
-    # R = 4.6*60.0*np.eye(6)
-
-    # Q = np.identity(6) * 0.00000013 + np.ones((6,6)) * 0.00000021
-    # R = np.identity(6) * 0.03925 + np.full(6, 0.0015)
-
-    Q = 1.0*np.dot(np.eye(6),np.diag([90,90,90,90,90,90]))
-    R = 1.0*np.dot(np.eye(6),np.diag([10**15,10**15,10**15,60,60,60]))
-    # Q = (1.0*10**-3)*np.eye(6)
-    # R = (1.0*10**-2)*np.eye(6)
-
-    # Q = (6.4*10**-6)*np.eye(6)
-    # R = (1.4*10**-7)*np.eye(6)
-
-
-    [r,p,y] = estimate_rot(data_num,P,Q,R)
+    [r,p,y] = estimate_rot4(data_num)
     plot([r[s:e],p[s:e],y[s:e]],[vroll,vpitch,vyaw])
 
 
