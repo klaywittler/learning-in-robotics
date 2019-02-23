@@ -35,7 +35,7 @@ def estimate_rot7(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(
     return roll, pitch, yaw
 
 
-def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(3)):
+def estimate_rot(data_num=1, P=100.0*np.eye(3), Q=100.0*np.eye(3), R=150.0*np.eye(3)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -51,11 +51,10 @@ def estimate_rot4(data_num=1, P=10.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(
     pitch = np.zeros(accelVals.shape[1])
     yaw = np.zeros(accelVals.shape[1])
 
-    # Q = np.diag([70,70,10])
-    # R = np.diag([85,85,25])
+    # Q = np.diag([100,100,100])
+    # R = np.diag([100,100,100])
+    # R = np.diag([10**4,10**4,10**2])
     # R = 10**15*np.eye(3)
-    Q=100.0*np.eye(3)
-    R=100.0*np.eye(3)
 
     for i in range(len(dt)): 
         z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
@@ -89,7 +88,7 @@ def estimate_quat7(data_num=1, P=1.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(
     return orient
 
 
-def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(3)):
+def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=100.0*np.eye(3), R=10.0**15*np.eye(3)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -101,13 +100,19 @@ def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(
 
     x4 = np.array([1.0,0,0,0])
 
+    Q = np.diag([100,100,100])
+    R = np.diag([10**4,10**4,10**4 ])
+    # R = 10**15*np.eye(3)
+    # Q = 10.0**4*np.eye(3)
+    # R = 50.0*np.eye(3)
+
     roll = np.zeros(accelVals.shape[1])
     pitch = np.zeros(accelVals.shape[1])
     yaw = np.zeros(accelVals.shape[1])
     orient = np.zeros((4,len(accelVals[0,:])))
 
     for i in range(len(dt)):
-        z4 = np.array([-accelVals[0,i],-accelVals[1,i],accelVals[2,i]])
+        z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
         u4 = np.array([gyroVals[0,i],gyroVals[1,i],gyroVals[2,i]])
         x4,P = UKF4(dt[i],x4,u4,P,Q,z4,R)
         orient[:,i] = x4
@@ -115,7 +120,7 @@ def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=70.0*np.eye(3), R=85.0*np.eye(
 
 
 if __name__ == "__main__":
-    data_num = 3
+    data_num = 1
 
     viconFile = 'vicon/viconRot' + str(data_num) + '.mat'
     vicon = sio.loadmat(viconFile)
@@ -143,7 +148,7 @@ if __name__ == "__main__":
         vroll[i], vpitch[i], vyaw[i] = rot2eul(viconRot[:,:,i])
 
 
-    [r,p,y] = estimate_rot4(data_num)
+    [r,p,y] = estimate_rot(data_num)
     plot([r[s:e],p[s:e],y[s:e]],[vroll,vpitch,vyaw])
 
 

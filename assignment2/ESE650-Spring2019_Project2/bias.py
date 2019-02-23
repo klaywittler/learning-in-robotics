@@ -9,9 +9,9 @@ def calibrate(vals,sensor,calibrate=False,iteration=700):
     if calibrate:
         bias = np.transpose(np.array([np.average(vals[:, 0:iteration],axis=1)]))
         if sensor == 'accelerometer':
-            sensitivity = 33.0
+            sensitivity = 34.5*np.array([1.0,1.0,1.0]) # 33.0
         elif sensor == 'gyro':
-            sensitivity = 218.0
+            sensitivity = 180/np.pi*np.array([3.5,3.5,3.5])
         print(bias)
     else:
         if sensor == 'accelerometer':
@@ -23,7 +23,7 @@ def calibrate(vals,sensor,calibrate=False,iteration=700):
             # bias =  np.transpose(np.array([[376.0,376.0,381.0]]))
             bias =  np.transpose(np.array([[373.74337241,375.59278629,370.04075744]]))
             # sensitivity = 218.0*np.array([1.0,1.0,1.0]) # 218.0 
-            sensitivity = 180/np.pi*np.array([3.8,3.8,3.8])
+            sensitivity = 180/np.pi*np.array([3.5,3.5,3.5])
         else:
             return 'error'
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         a[:,i] = np.dot(viconRot[:,:,i],g)
 
     accelVals = calibrate(accelVals,'accelerometer')
-    gyroVals = calibrate(gyroVals,'gyro')
+    gyroVals = calibrate(gyroVals,'gyro',calibrate=True)
 
     zroll, zpitch, zyaw = accelerometer(accelVals)
     # plot([zroll,zpitch,zyaw],[vroll,vpitch,vyaw])

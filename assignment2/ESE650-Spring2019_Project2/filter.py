@@ -86,17 +86,15 @@ def UKF4(dt,x,u,P,Q,z,R):
     Kp = np.dot(K,v)
     Kq = axang2quat(Kp)
     xk = quatMult(x_k,Kq, normalize=nrm)
-    # xk = x_k
     Pk = P_k - np.matmul(np.matmul(K,Pvv),np.transpose(K))    
     return xk,Pk
 
 
-def quatMean(Yq,xq,normalize=False):
-    qBar = quatCong(xq)
+def quatMean(Yq,qBar,normalize=False):
     error = 1.0
     count = 0
     while error >= 10**-2:
-        Eq = quatMult(Yq,qBar,normalize=normalize)
+        Eq = quatMult(Yq,quatCong(qBar),normalize=normalize)
         eVec = quat2axang(Eq)
         eMean = np.mean(eVec, axis=1)
         error = np.linalg.norm(eMean,axis=0)
