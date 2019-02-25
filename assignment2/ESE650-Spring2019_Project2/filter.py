@@ -73,6 +73,8 @@ def UKF4(dt,x,u,P,Q,z,R):
     Zq = quatMult(quatMult(Y,g),quatCong(Y))
     Z = Zq[1::,:]
     z_k = np.mean(Z,axis=1)
+    # z_k = quatMult(quatMult(x_k,g),quatCong(x_k))
+    # z_k = z_k[1::]
     Z_k = Z-z_k[:,np.newaxis]
     v = z - z_k
 

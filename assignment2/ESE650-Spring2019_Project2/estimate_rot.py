@@ -35,7 +35,7 @@ def estimate_rot7(data_num=1, P=10.0*np.eye(6), Q=90.0*np.eye(6), R=60.0*np.eye(
     return roll, pitch, yaw
 
 
-def estimate_rot(data_num=1, P=100.0*np.eye(3), Q=100.0*np.eye(3), R=150.0*np.eye(3)):
+def estimate_rot(data_num=1, P=100.0*np.eye(3), Q=80.0*np.eye(3), R=100.0*np.eye(3)):
     file = 'imu/imuRaw' + str(data_num) + '.mat'
     imu = sio.loadmat(file)
     accelVals = imu['vals'][0:3,:]
@@ -54,7 +54,8 @@ def estimate_rot(data_num=1, P=100.0*np.eye(3), Q=100.0*np.eye(3), R=150.0*np.ey
     # Q = np.diag([100,100,100])
     # R = np.diag([100,100,100])
     # R = np.diag([10**4,10**4,10**2])
-    # R = 10**15*np.eye(3)
+    # Q = 10**15*np.eye(3)
+    R = 10**15*np.eye(3)
 
     for i in range(len(dt)): 
         z4 = np.array([accelVals[0,i],accelVals[1,i],accelVals[2,i]])
@@ -120,7 +121,7 @@ def estimate_quat4(data_num=1, P=1.0*np.eye(3), Q=100.0*np.eye(3), R=10.0**15*np
 
 
 if __name__ == "__main__":
-    data_num = 1
+    data_num = 2
 
     viconFile = 'vicon/viconRot' + str(data_num) + '.mat'
     vicon = sio.loadmat(viconFile)
