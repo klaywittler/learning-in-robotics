@@ -13,9 +13,22 @@ def motion_model(u, dt, ekf_state, vehicle_params):
         df/dX, the 3x3 Jacobian of f with respect to the vehicle state (x, y, phi)
     '''
 
-    ###
-    # Implement the vehicle model and its Jacobian you derived.
-    ###
+    a = vehicle_params['a']
+    b = vehicle_params['b']
+    L = vehicle_params['L']
+    H = vehicle_params['H']
+    ve = u[0]
+    alpha = u[1]
+    vc = ve/(1-np.tan(alpha)*(H/L))
+    x = ekf_state['x']
+
+    motion = np.array([dt*(vc*np.cos(x[2]) - (vc/L)*np.tan(alpha)*(a*np.sin(x[2])+b*np.cos(x[2]))),
+                        dt*(vc*np.sin(x[2]) + (vc/L)*np.tan(alpha)*(a*np.cos(x[2])-b*np.sin(x[2]))),
+                        dt*(vc/L)*np.tan(alpha)])
+
+    G = np.array([1, 0, dt*(-vc*np.sin(x[2]) - (vc/L)*np.tan(alpha)*(a*np.cos(x[2])-b*np.sin(x[2]))),
+                    0, 1, dt*(vc*np.cos(x[2]) + (vc/L)*np.tan(alpha)*(-a*np.sin(x[2])-b*np.cos(x[2]))),
+                    0,0,1])
 
     return motion, G
 
@@ -26,10 +39,9 @@ def odom_predict(u, dt, ekf_state, vehicle_params, sigmas):
 
     Returns the new ekf_state.
     '''
-
-    ###
-    # Implement the propagation
-    ###
+    # print('odom')
+    motion, G = motion_model(u, dt, ekf_state, vehicle_params)
+    ekf_state['x'] = ekf_state['x'] + motion
 
     return ekf_state
 
@@ -40,10 +52,16 @@ def gps_update(gps, ekf_state, sigmas):
 
     Returns the updated ekf_state.
     '''
-    
-    ###
-    # Implement the GPS update.
-    ###
+    # print('gps')
+    x = ekf_state['x']
+    z = np.array([gps[0],gps[1],0])
+    H = np.diag([1.0,1.0,0])
+    Q = np.diag([sigmas['xy'],sigmas['xy'],sigmas['phi']])
+    P = ekf_state['P']
+    K = np.matmul(np.matmul(P,H.T),np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T))
+    r = z-np.dot(H,x)
+    ekf_state['x'] = x + np.dot(K,r)
+    ekf_state['P'] = np.matmul((np.eye(3) - np.matmul(K,H)),P)
     
     return ekf_state
 
@@ -63,6 +81,8 @@ def laser_measurement_model(ekf_state, landmark_id):
     ###
     # Implement the measurement model and its Jacobian you derived
     ###
+    H = 0
+    zhat = 0
 
     return zhat, H
 
