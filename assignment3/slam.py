@@ -26,9 +26,9 @@ def motion_model(u, dt, ekf_state, vehicle_params):
                         dt*(vc*np.sin(x[2]) + (vc/L)*np.tan(alpha)*(a*np.cos(x[2])-b*np.sin(x[2]))),
                         dt*(vc/L)*np.tan(alpha)])
 
-    G = np.array([1.0, 0, dt*(-vc*np.sin(x[2]) - (vc/L)*np.tan(alpha)*(a*np.cos(x[2])-b*np.sin(x[2]))),
-                    0, 1.0, dt*(vc*np.cos(x[2]) + (vc/L)*np.tan(alpha)*(-a*np.sin(x[2])-b*np.cos(x[2]))),
-                    0,0,1.0])
+    G = np.array([[1.0, 0, dt*(-vc*np.sin(x[2]) - (vc/L)*np.tan(alpha)*(a*np.cos(x[2])-b*np.sin(x[2])))],
+                    [0, 1.0, dt*(vc*np.cos(x[2]) + (vc/L)*np.tan(alpha)*(-a*np.sin(x[2])-b*np.cos(x[2])))],
+                    [0,0,1.0]])
 
     return motion, G
 
@@ -41,8 +41,11 @@ def odom_predict(u, dt, ekf_state, vehicle_params, sigmas):
     '''
     # print('odom')
     motion, G = motion_model(u, dt, ekf_state, vehicle_params)
+    R = np.diag([sigmas['xy'],sigmas['xy'],sigmas['phi']])
+
     ekf_state['x'] = ekf_state['x'] + motion
     ekf_state['x'][2] = slam_utils.clamp_angle(ekf_state['x'][2])
+    ekf_state['P'] = slam_utils.make_symmetric(np.matmul(np.matmul(G,ekf_state['P']),G.T) + R)
 
     return ekf_state
 
@@ -57,7 +60,7 @@ def gps_update(gps, ekf_state, sigmas):
     x = ekf_state['x']
     z = np.array([gps[0],gps[1],0])
     H = np.diag([1.0,1.0,0])
-    Q = np.diag([sigmas['xy'],sigmas['xy'],sigmas['phi']])
+    Q = np.diag([sigmas['gps'],sigmas['gps'],1.0])
     P = ekf_state['P']
     S = np.matmul(np.matmul(H,P),H.T)+Q.T
     r = z-np.dot(H,x)
@@ -148,6 +151,12 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
     ###
     # Implement this function.
     ###
+    for i in range(ekf_state['num_landmarks']):
+        z, H = laser_measurement_model(ekf_state, landmark_id)
+        Q = np.diag([sigmas['range'],sigmas['bearing']])
+        P = ekf_state['P']
+        S = np.matmul(np.matmul(H,P),H.T)+Q.T
+
     slam_utils.solve_cost_matrix_heuristic(M)
 
     return assoc
