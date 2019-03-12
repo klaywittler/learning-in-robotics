@@ -169,7 +169,8 @@ def plot_covariance(ekf_state, plot):
 def plot_state(ekf_state, plot, params):
     plot_map(ekf_state, plot, params)
     plot_robot(ekf_state, plot)
-    plot_covariance(ekf_state, plot)
+    if params['plot_vehicle_covariances']:
+        plot_covariance(ekf_state, plot)
 
 def do_plot(xhist, ekf_state, trees, scan, assoc, plot, params):
     plot_trajectory(xhist, plot)
