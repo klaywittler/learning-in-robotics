@@ -45,7 +45,9 @@ def odom_predict(u, dt, ekf_state, vehicle_params, sigmas):
 
     ekf_state['x'] = ekf_state['x'] + motion
     ekf_state['x'][2] = slam_utils.clamp_angle(ekf_state['x'][2])
-    ekf_state['P'] = slam_utils.make_symmetric(np.matmul(np.matmul(G,ekf_state['P']),G.T) + R)
+
+    ekf_state['P'][0:3,0:3] = np.matmul(np.matmul(G,ekf_state['P'][0:3,0:3]),G.T) + R
+    ekf_state['P'] = slam_utils.make_symmetric(ekf_state['P'])
 
     return ekf_state
 
@@ -57,18 +59,19 @@ def gps_update(gps, ekf_state, sigmas):
     Returns the updated ekf_state.
     '''
     # print('gps')
-    x = ekf_state['x']
-    z = np.array([gps[0],gps[1],0])
-    H = np.diag([1.0,1.0,0])
-    Q = np.diag([sigmas['gps'],sigmas['gps'],1.0])
-    P = ekf_state['P']
-    S = np.matmul(np.matmul(H,P),H.T)+Q.T
+    x = ekf_state['x'][0:2]
+    z = np.array([gps[0],gps[1]])
+    H = np.diag([1.0,1.0])
+    Q = np.diag([sigmas['gps'],sigmas['gps']])
+    P = ekf_state['P'][0:2,0:2]
+
     r = z-np.dot(H,x)
+    S = np.matmul(np.matmul(H,P),H.T)+Q.T
 
     if mahalanobisDist(r,S) <= 13.8:
         K = np.matmul(np.matmul(P,H.T),np.linalg.inv(S))
-        ekf_state['x'] = x + np.dot(K,r)
-        ekf_state['P'] = slam_utils.make_symmetric(np.matmul((np.eye(3) - np.matmul(K,H)),P))
+        ekf_state['x'][0:2] = x + np.dot(K,r)
+        ekf_state['P'][0:2,0:2] = slam_utils.make_symmetric(np.matmul((np.eye(2) - np.matmul(K,H)),P))
     
     return ekf_state
 
@@ -88,21 +91,14 @@ def laser_measurement_model(ekf_state, landmark_id):
     ###
     # Implement the measurement model and its Jacobian you derived
     ###
-    a = vehicle_params['a']
-    b = vehicle_params['b']
-    L = vehicle_params['L']
-    H = vehicle_params['H']
-    ve = u[0]
-    alpha = u[1]
-    vc = ve/(1-np.tan(alpha)*(H/L))
     x = ekf_state['x']
     xL = x[3 + 2*(landmark_id - 1):3 + 2*(landmark_id - 1) +1]
     H = np.zeros((2,3+2*ekf_state['num_landmarks']))
 
-    H[0:3,:] = np.array([[(x[0]-xL[0])/np.linalg.norm(xL - x[0:2]), (x[1]-xL[1])/np.linalg.norm(xL - x[0:2]), 0],
+    H[:,0:3] = np.array([[(x[0]-xL[0])/np.linalg.norm(xL - x[0:2]), (x[1]-xL[1])/np.linalg.norm(xL - x[0:2]), 0],
                              [(xL[1]-x[1])/((xL[0]-x[0])**2 + (xL[1]-x[1])**2), -1.0/((1+((xL[1]-x[1])/(xL[0]-x[0]))**2)*(xL[0]-x[0])), -1]])
 
-    H[3 + 2*(landmark_id - 1):3 + 2*(landmark_id - 1) +1,:] = np.array([[(xL[0]-x[0])/np.linalg.norm(xL - x[0:2]), (xL[1]-x[1])/np.linalg.norm(xL - x[0:2])],
+    H[:,3 + 2*(landmark_id - 1):3 + 2*(landmark_id - 1) +1] = np.array([[(xL[0]-x[0])/np.linalg.norm(xL - x[0:2]), (xL[1]-x[1])/np.linalg.norm(xL - x[0:2])],
                                                                 [(x[1]-xL[1])/((xL[0]-x[0])**2 + (xL[1]-x[1])**2), 1.0/((1+((xL[1]-x[1])/(xL[0]-x[0]))**2)*(xL[0]-x[0]))]])
 
     zhat = np.array([np.linalg.norm(xL - x[0:2]), np.arctan2((xL[1]-x[1])/(xL[0]-x[0])) - x[2] + np.pi/2.0])
@@ -116,16 +112,18 @@ def initialize_landmark(ekf_state, tree):
 
     Returns the new ekf_state.
     '''
-    print('init')
+    # print('init')
     ekf_state['num_landmarks'] += 1
     x = ekf_state['x']
-    xL = np.sqrt((tree[0]**2 - np.tan(tree[1]+x[2]-np.pi/2)**2)/2.0) + x[0]
-    yL = np.tan(tree[1]+x[2]-np.pi/2)*(xL-x[0]) + x[1]
+    # xL = np.sqrt((tree[0]**2 - np.tan(tree[1]+x[2]-np.pi/2)**2)/2.0) + x[0]
+    # yL = np.tan(tree[1]+x[2]-np.pi/2)*(xL-x[0]) + x[1]
+    xL = tree[0]*np.cos(tree[1]) + x[0]
+    yL = tree[0]*np.sin(tree[1]) + x[1]
     ekf_state['x'] = np.concatenate((x,np.array([xL,yL])),axis=0)
     N = ekf_state['P'].shape
     pTemp = np.zeros((N[0]+1,N[1]+1))
     pTemp[:-1,:-1] = ekf_state['P']
-    pTemp[N,N] = 10.0
+    pTemp[N,N] = 1.0
     ekf_state['P'] = slam_utils.make_symmetric(pTemp)
 
     return ekf_state
@@ -143,22 +141,28 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
         assoc[i] == -1 if measurement i is determined to be a new, previously unseen landmark, or,
         assoc[i] == -2 if measurement i is too ambiguous to use and should be discarded.
     '''
-    # print('assoc')
+    print('assoc')
+    # print(measurements)
+    # print('space')
     if ekf_state["num_landmarks"] == 0:
         # set association to init new landmarks for all measurements
         return [-1 for m in measurements]
+    else:
+        assoc = np.zeros((ekf_state['num_landmarks'],1))
+        M = np.zeros((ekf_state['num_landmarks'],ekf_state['num_landmarks'])) 
+        for i in range(ekf_state['num_landmarks']):
+            zhat, H = laser_measurement_model(ekf_state, i)
+            for j in measurements:
+                z = np.array([measurements[j][0],measurements[j][1]])
+                Q = np.diag([sigmas['range'],sigmas['bearing']])
+                P = ekf_state['P']
+                S = np.matmul(np.matmul(H,P),H.T)+Q.T
+                r = z - zhat
+                M[i,j] = mahalanobisDist(r,S)
 
-    ###
-    # Implement this function.
-    ###
-    for i in range(ekf_state['num_landmarks']):
-        z, H = laser_measurement_model(ekf_state, landmark_id)
-        Q = np.diag([sigmas['range'],sigmas['bearing']])
-        P = ekf_state['P']
-        S = np.matmul(np.matmul(H,P),H.T)+Q.T
+        assoc = slam_utils.solve_cost_matrix_heuristic(M)
 
-    slam_utils.solve_cost_matrix_heuristic(M)
-
+    print(assoc)
     return assoc
 
 def laser_update(trees, assoc, ekf_state, sigmas, params):
@@ -180,24 +184,35 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
     ###
     # Implement the EKF update for a set of range, bearing measurements.
     ###
-    # print('laser')
+    print('laser')
 
-    measurements = [tree[0:2] for tree in trees]
-    assoc = compute_data_association(ekf_state,measurements,sigmas,params)
-    # ekf_state1 = [initialize_landmark(ekf_state,measurements[x]) for i, x in enumerate(np.where(np.array(assoc) == -1)[0])]
+    # print(ekf_state)
+    # print('space')
 
-    # x = ekf_state['x']
-    # z = np.array([gps[0],gps[1],0])
-    # H = np.diag([1.0,1.0,0])
-    # Q = np.diag([sigmas['xy'],sigmas['xy'],sigmas['phi']])
-    # P = ekf_state['P']
-    # S = np.matmul(np.matmul(H,P),H.T)+Q.T
-    # r = z-np.dot(H,x)
+    x = ekf_state['x']
+    print(assoc[1] == -1)
+    for i, v in enumerate(assoc[assoc == -1]):
+        print(i)
+        z = trees[0:2][i]
+        zhat, H = laser_measurement_model(ekf_state, i+1)
+        print(assoc[i])
+    
 
-    # if mahalanobisDist(r,S): 
-    #     K = np.matmul(np.matmul(P,H.T),np.linalg.inv(S))
-    #     ekf_state['x'] = x + np.dot(K,r)
-    #     ekf_state['P'] = slam_utils.make_symmetric(np.matmul((np.eye(3) - np.matmul(K,H)),P))
+    
+
+    Q = np.diag([sigmas['range'],sigmas['bearing']])
+    P = ekf_state['P']
+
+    r = z-zhat
+    S = np.matmul(np.matmul(H,P),H.T)+Q.T
+
+    K = np.matmul(np.matmul(P,H.T),np.linalg.inv(S))
+    ekf_state['x'] = x + np.dot(K,r)
+    ekf_state['P'][0:2,0:2] = slam_utils.make_symmetric(np.matmul((np.eye(2) - np.matmul(K,H)),P))
+
+    for i, v in enumerate(np.where(assoc == -1)[0]):
+        # print(i)
+        initialize_landmark(ekf_state,trees[v])
 
     return ekf_state
 
@@ -312,7 +327,7 @@ def main():
     run_ekf_slam(events, ekf_state, vehicle_params, filter_params, sigmas)
 
 if __name__ == '__main__':
-    # p = np.array([[0,1],[2,3]])
+    # p = np.array([[0,1,6],[2,3,6]])
     # d = np.diag([p.shape)
-    # print(p.shape[0])
+    # print(p[0:2,0:2])
     main()
