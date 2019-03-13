@@ -167,7 +167,8 @@ def plot_covariance(ekf_state, plot):
     plot["cov"].setData(circ, pen='b')
 
 def plot_state(ekf_state, plot, params):
-    plot_map(ekf_state, plot, params)
+    if params['plot_map']:
+        plot_map(ekf_state, plot, params)
     plot_robot(ekf_state, plot)
     if params['plot_vehicle_covariances']:
         plot_covariance(ekf_state, plot)
@@ -175,6 +176,7 @@ def plot_state(ekf_state, plot, params):
 def do_plot(xhist, ekf_state, trees, scan, assoc, plot, params):
     plot_trajectory(xhist, plot)
     plot_state(ekf_state, plot, params)
+    # if params['plot_tree_measurements']:
     plot_tree_measurements(trees, assoc, ekf_state, plot)
     if len(scan) > 0 and params["plot_raw_laser"]:
         plot_scan(ekf_state, scan, plot, params)
