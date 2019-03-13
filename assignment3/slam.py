@@ -109,14 +109,8 @@ def initialize_landmark(ekf_state, tree):
 
     Returns the new ekf_state.
     '''
-    # print('init')
     ekf_state['num_landmarks'] += 1
-    x = ekf_state['x']
-    # xL = slam_utils.tree_to_global_xy(tree, ekf_state)
-    ekf_state['x'] = np.concatenate((x,tree),axis=0)
-    # xL = tree[0]*np.cos(tree[1]+x[2]) + x[0]
-    # yL = tree[0]*np.sin(tree[1]+x[2]) + x[1]
-    # ekf_state['x'] = np.concatenate((x,np.array([xL,yL])),axis=0)
+    ekf_state['x'] = np.concatenate((ekf_state['x'],tree),axis=0)
     N = ekf_state['P'].shape
     pTemp = 0.1*np.eye((N[0]+2))
     pTemp[:-2,:-2] = ekf_state['P']
@@ -143,14 +137,20 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
         # set association to init new landmarks for all measurements
         return [-1 for m in measurements]
     else:
+        x = ekf_state['x']
         M = np.zeros((ekf_state['num_landmarks'],len(measurements))) 
         Q = np.diag([sigmas['range'],sigmas['bearing']])
         P = ekf_state['P']
         Zm = np.array(measurements)[:,0:2]
+        Zm_xy = slam_utils.tree_to_global_xy(Zm, ekf_state).T
         for i in range(ekf_state['num_landmarks']):
             zhat, H = laser_measurement_model(ekf_state, i+1)
+            ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
-            r = Zm - zhat
+            # Sinv = np.linalg.inv(H @ P @ H.T + Q.T)
+            # r = Zm - zhat
+            print(Zm.shape)
+            r = Zm_xy - ztest
             M[i,:] = mahalanobisDist(r,Sinv)
 
         C = slam_utils.solve_cost_matrix_heuristic(np.copy(M))
@@ -191,11 +191,15 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
             x = ekf_state['x']
             z = np.array([trees[i][0],trees[i][1]])
             zhat, H = laser_measurement_model(ekf_state, v)
+            # xL = tree[0]*np.cos(tree[1]+x[2]) + x[0]
+            # yL = tree[0]*np.sin(tree[1]+x[2]) + x[1]
+            ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
+            # print(ztest)
         
             Q = np.diag([sigmas['range'],sigmas['bearing']])
             P = ekf_state['P']
 
-            r = z-zhat
+            r = measurements[:,i]-ztest
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
 
             K = np.matmul(np.matmul(P,H.T),Sinv)
@@ -297,7 +301,7 @@ def main():
         "plot_raw_laser": False,
         "plot_map_covariances": False,
         "plot_vehicle_covariances": False,
-        "plot_map": False,
+        "plot_map": True,
         # "plot_tree_measurements": True
 
         # Add other parameters here if you need to...
