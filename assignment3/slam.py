@@ -40,7 +40,7 @@ def odom_predict(u, dt, ekf_state, vehicle_params, sigmas):
     Returns the new ekf_state.
     '''
     motion, G = motion_model(u, dt, ekf_state, vehicle_params)
-    R = np.diag([sigmas['xy'],sigmas['xy'],sigmas['phi']])
+    R = np.diag([sigmas['xy']**2,sigmas['xy']**2,sigmas['phi']**2])
 
     ekf_state['x'][0:3] = ekf_state['x'][0:3] + motion
     ekf_state['x'][2] = slam_utils.clamp_angle(ekf_state['x'][2])
@@ -57,19 +57,21 @@ def gps_update(gps, ekf_state, sigmas):
 
     Returns the updated ekf_state.
     '''
-    # print('x: ', x, ' gps: ', gps)
-    H = np.array([[1.0,0,0],[0,1.0,0]])
-    Q = np.diag([sigmas['gps'],sigmas['gps']])
-    P = ekf_state['P'][0:3,0:3]
+    # print('x: ', ekf_state['x'][0:2], ' gps: ', gps)
+    # H = np.array([[1.0,0,0],[0,1.0,0]])
+    H = np.zeros((2,3+2*ekf_state['num_landmarks']))
+    H[0:2,:2] = np.eye(2)
+    Q = np.diag([sigmas['gps']**2,sigmas['gps']**2])
+    P = ekf_state['P']
 
-    r = gps[::-1]-ekf_state['x'][0:2]
+    r = gps-ekf_state['x'][0:2]
     Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
 
-    if mahalanobisDist(r,Sinv) <= 13.816:
+    if mahalanobisDist(r,Sinv) <= 13.816: 
         K = np.matmul(np.matmul(P,H.T),Sinv)
-        ekf_state['x'][0:3] = ekf_state['x'][0:3] + np.dot(K,r)
+        ekf_state['x'] = ekf_state['x'] + np.dot(K,r)
         ekf_state['x'][2] = slam_utils.clamp_angle(ekf_state['x'][2])
-        ekf_state['P'][0:3,0:3] = slam_utils.make_symmetric(np.matmul((np.eye(3) - np.matmul(K,H)),P))
+        ekf_state['P'] = slam_utils.make_symmetric(np.matmul((np.eye(P.shape[0]) - np.matmul(K,H)),P))
     
     return ekf_state
 
@@ -96,7 +98,6 @@ def laser_measurement_model(ekf_state, landmark_id):
     H[:,3 + 2*(landmark_id - 1):3 + 2*(landmark_id - 1) +2] = np.array([[(xL[0]-x[0])/np.linalg.norm(xL - x[0:2]), (xL[1]-x[1])/np.linalg.norm(xL - x[0:2])],
                                                                 [(x[1]-xL[1])/((xL[0]-x[0])**2 + (xL[1]-x[1])**2), 1.0/((1+((xL[1]-x[1])/(xL[0]-x[0]))**2)*(xL[0]-x[0]))]])
 
-    # zhat = np.array([np.linalg.norm(xL - x[0:2]), np.arctan2((xL[1]-x[1]),(xL[0]-x[0])) - x[2] + np.pi/2.0])
     zhat = np.array([np.linalg.norm(xL - x[0:2]), np.arctan2((xL[1]-x[1]),(xL[0]-x[0])) - x[2]])
 
     return zhat, H
@@ -112,7 +113,7 @@ def initialize_landmark(ekf_state, tree):
     ekf_state['num_landmarks'] += 1
     ekf_state['x'] = np.concatenate((ekf_state['x'],tree),axis=0)
     N = ekf_state['P'].shape
-    pTemp = 0.1*np.eye((N[0]+2))
+    pTemp = 10**3*np.eye((N[0]+2))
     pTemp[:-2,:-2] = ekf_state['P']
     ekf_state['P'] = slam_utils.make_symmetric(pTemp)
 
@@ -137,32 +138,41 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
         # set association to init new landmarks for all measurements
         return [-1 for m in measurements]
     else:
-        x = ekf_state['x']
-        M = np.zeros((ekf_state['num_landmarks'],len(measurements))) 
-        Q = np.diag([sigmas['range'],sigmas['bearing']])
+        B = 5.991*np.ones((len(measurements),len(measurements)))
+        M = np.zeros((len(measurements),ekf_state['num_landmarks'])) 
+        Q = np.diag([sigmas['range']**2,sigmas['bearing']**2])
         P = ekf_state['P']
         Zm = np.array(measurements)[:,0:2]
-        Zm_xy = slam_utils.tree_to_global_xy(Zm, ekf_state).T
         for i in range(ekf_state['num_landmarks']):
             zhat, H = laser_measurement_model(ekf_state, i+1)
-            ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
             # Sinv = np.linalg.inv(H @ P @ H.T + Q.T)
-            # r = Zm - zhat
-            print(Zm.shape)
-            r = Zm_xy - ztest
-            M[i,:] = mahalanobisDist(r,Sinv)
+            r = Zm - zhat
+            M[:,i] = mahalanobisDist(r,Sinv)
 
-        C = slam_utils.solve_cost_matrix_heuristic(np.copy(M))
-        assoc = [-1]*(len(measurements))
-        for v in C:
-            if M[v] > 13.816:
-                assoc[v[1]] = -1
-            elif M[v] > 5.991:
-                assoc[v[1]] = -2
+        Mpad = np.concatenate((M,B),axis=1)
+
+        M_org = np.copy(Mpad)
+        C1 = slam_utils.solve_cost_matrix_heuristic(Mpad)
+        # C2 = slam_utils.solve_cost_matrix_heuristic(M)
+        # c2 = [c[0] for c in C2]
+        # print("C1: ", C)
+        # print("C2: ", C2)
+        # print("c2: ", c2)
+        assoc = [-2]*(len(measurements))
+        for v in C1:
+            # idx2 = c2.index(v[0])
+            # d1 = M_org[v]
+            # d2 = M_org[C2[idx2]]
+            # if abs((d2-d1)/d2) <= 0.1:
+            #     assoc[v[0]] = -2
+
+            if v[1] < ekf_state['num_landmarks']:
+                assoc[v[0]] = v[1] + 1
             else:
-                assoc[v[1]] = v[0] + 1
-
+                if np.min(M[v[0],:]) > 9.21: #13.816
+                    assoc[v[0]] = -1
+ 
     return assoc
 
 
@@ -183,23 +193,20 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
     '''
     # print('laser')
     measurements = slam_utils.tree_to_global_xy(trees, ekf_state)
-    # print(measurements)
-    for i, v in enumerate(assoc):
-        if v == -1:
+    for i, t in enumerate(trees):
+        if assoc[i] == -1:
             ekf_state = initialize_landmark(ekf_state, measurements[:,i])
-        elif v > 0:
-            x = ekf_state['x']
-            z = np.array([trees[i][0],trees[i][1]])
-            zhat, H = laser_measurement_model(ekf_state, v)
-            # xL = tree[0]*np.cos(tree[1]+x[2]) + x[0]
-            # yL = tree[0]*np.sin(tree[1]+x[2]) + x[1]
-            ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
-            # print(ztest)
+            assoc[i] = ekf_state['num_landmarks']
         
-            Q = np.diag([sigmas['range'],sigmas['bearing']])
+        if assoc[i] > 0:
+            x = ekf_state['x']
+            z = np.array([t[0],t[1]])
+            zhat, H = laser_measurement_model(ekf_state, assoc[i])
+        
+            Q = np.diag([sigmas['range']**2,sigmas['bearing']**2])
             P = ekf_state['P']
 
-            r = measurements[:,i]-ztest
+            r = z-zhat
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
 
             K = np.matmul(np.matmul(P,H.T),Sinv)
@@ -240,8 +247,9 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
 
     for i, event in enumerate(events):
         t = event[1][0]
-        if i % 1000 == 0:
+        if i % 250 == 0:
             print("t = {}".format(t))
+            print("state size = {}".format(ekf_state['x'].shape))
 
         if event[0] == 'gps':
             gps_msmt = event[1][1:]
@@ -261,7 +269,7 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
             scan = event[1][1:]
             trees = tree_extraction.extract_trees(scan, filter_params)
             assoc = compute_data_association(ekf_state, trees, sigmas, filter_params)
-            ekf_state = laser_update(trees, assoc, ekf_state, sigmas, filter_params) 
+            # ekf_state = laser_update(trees, assoc, ekf_state, sigmas, filter_params) 
             if filter_params["do_plot"]:
                 slam_utils.do_plot(state_history['x'], ekf_state, trees, scan, assoc, plot, filter_params)
 
@@ -298,9 +306,9 @@ def main():
 
         # general...
         "do_plot": True,
-        "plot_raw_laser": False,
+        "plot_raw_laser": True,
         "plot_map_covariances": False,
-        "plot_vehicle_covariances": False,
+        "plot_vehicle_covariances": True,
         "plot_map": True,
         # "plot_tree_measurements": True
 
@@ -315,8 +323,8 @@ def main():
 
         # Measurement noise
         "gps": 3,
-        "range": 0.4,
-        "bearing": 3*np.pi/180
+        "range": 0.5,
+        "bearing": 5*np.pi/180
     }
 
     # Initial filter state
