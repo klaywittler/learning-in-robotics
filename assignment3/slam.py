@@ -60,7 +60,7 @@ def gps_update(gps, ekf_state, sigmas):
     # print('x: ', ekf_state['x'][0:2], ' gps: ', gps)
     # H = np.array([[1.0,0,0],[0,1.0,0]])
     H = np.zeros((2,3+2*ekf_state['num_landmarks']))
-    H[0:2,:2] = np.eye(2)
+    H[0:2,0:2] = np.eye(2)
     Q = np.diag([sigmas['gps']**2,sigmas['gps']**2])
     P = ekf_state['P']
 
@@ -111,7 +111,10 @@ def initialize_landmark(ekf_state, tree):
     Returns the new ekf_state.
     '''
     ekf_state['num_landmarks'] += 1
-    ekf_state['x'] = np.concatenate((ekf_state['x'],tree),axis=0)
+    # ekf_state['x'] = np.concatenate((ekf_state['x'],tree),axis=0)
+    x = ekf_state['x']
+    xL = np.array([tree[0]*np.cos(tree[1]+x[2]) + x[0] , tree[0]*np.sin(tree[1]+x[2]) + x[1]])
+    ekf_state['x'] = np.concatenate((x,xL) ,axis=0)
     N = ekf_state['P'].shape
     pTemp = 10**3*np.eye((N[0]+2))
     pTemp[:-2,:-2] = ekf_state['P']
@@ -138,16 +141,22 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
         # set association to init new landmarks for all measurements
         return [-1 for m in measurements]
     else:
+        x = ekf_state['x']
+
         B = 5.991*np.ones((len(measurements),len(measurements)))
         M = np.zeros((len(measurements),ekf_state['num_landmarks'])) 
         Q = np.diag([sigmas['range']**2,sigmas['bearing']**2])
         P = ekf_state['P']
         Zm = np.array(measurements)[:,0:2]
+        # Zm_xy = slam_utils.tree_to_global_xy(Zm, ekf_state).T
         for i in range(ekf_state['num_landmarks']):
             zhat, H = laser_measurement_model(ekf_state, i+1)
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
-            # Sinv = np.linalg.inv(H @ P @ H.T + Q.T)
             r = Zm - zhat
+
+            ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
+            # r = Zm_xy - ztest
+
             M[:,i] = mahalanobisDist(r,Sinv)
 
         Mpad = np.concatenate((M,B),axis=1)
@@ -164,14 +173,12 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
             # idx2 = c2.index(v[0])
             # d1 = M_org[v]
             # d2 = M_org[C2[idx2]]
-            # if abs((d2-d1)/d2) <= 0.1:
-            #     assoc[v[0]] = -2
+            # if abs((d2-d1)/d2) > 0.1:
 
             if v[1] < ekf_state['num_landmarks']:
                 assoc[v[0]] = v[1] + 1
-            else:
-                if np.min(M[v[0],:]) > 9.21: #13.816
-                    assoc[v[0]] = -1
+            elif np.min(M[v[0],:]) > 9.21: #13.816
+                assoc[v[0]] = -1
  
     return assoc
 
@@ -192,20 +199,24 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
     Returns the ekf_state.
     '''
     # print('laser')
-    measurements = slam_utils.tree_to_global_xy(trees, ekf_state)
+    # measurements = slam_utils.tree_to_global_xy(trees, ekf_state)
     for i, t in enumerate(trees):
-        if assoc[i] == -1:
-            ekf_state = initialize_landmark(ekf_state, measurements[:,i])
-            assoc[i] = ekf_state['num_landmarks']
+        j = assoc[i]
+        if j == -1:
+            # ekf_state = initialize_landmark(ekf_state, measurements[:,i])
+            ekf_state = initialize_landmark(ekf_state, t)
+            j = ekf_state['num_landmarks']
         
-        if assoc[i] > 0:
+        if j > 0:
             x = ekf_state['x']
-            z = np.array([t[0],t[1]])
-            zhat, H = laser_measurement_model(ekf_state, assoc[i])
+            z = np.array(t[0:2])
+            zhat, H = laser_measurement_model(ekf_state, j)
         
             Q = np.diag([sigmas['range']**2,sigmas['bearing']**2])
             P = ekf_state['P']
 
+            # ztest = np.array([zhat[0]*np.cos(zhat[1]+x[2]) + x[0] , zhat[0]*np.sin(zhat[1]+x[2]) + x[1]])
+            # r = measurements[:,i]-ztest
             r = z-zhat
             Sinv = np.linalg.inv(np.matmul(np.matmul(H,P),H.T)+Q.T)
 
@@ -253,7 +264,7 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
 
         if event[0] == 'gps':
             gps_msmt = event[1][1:]
-            ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
+            # ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
 
         elif event[0] == 'odo':
             if last_odom_t < 0:
@@ -337,7 +348,4 @@ def main():
     run_ekf_slam(events, ekf_state, vehicle_params, filter_params, sigmas)
 
 if __name__ == '__main__':
-    # p = np.array([[0,1,6],[2,3,6]])
-    # d = np.diag([p.shape)
-    # print(p[0:2,0:2])
     main()
