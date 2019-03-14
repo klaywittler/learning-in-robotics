@@ -269,7 +269,7 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
             scan = event[1][1:]
             trees = tree_extraction.extract_trees(scan, filter_params)
             assoc = compute_data_association(ekf_state, trees, sigmas, filter_params)
-            # ekf_state = laser_update(trees, assoc, ekf_state, sigmas, filter_params) 
+            ekf_state = laser_update(trees, assoc, ekf_state, sigmas, filter_params) 
             if filter_params["do_plot"]:
                 slam_utils.do_plot(state_history['x'], ekf_state, trees, scan, assoc, plot, filter_params)
 
