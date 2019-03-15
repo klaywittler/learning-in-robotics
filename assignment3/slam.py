@@ -93,7 +93,7 @@ def laser_measurement_model(ekf_state, landmark_id):
 
     dh1dx = (x[0]-L[0])/np.linalg.norm(L - x[0:2])
     dh1dy = (x[1]-L[1])/np.linalg.norm(L - x[0:2])
-    dh2dx = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*((L[1]-x[1])/(L[0]-x[0])**2) # (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
+    dh2dx = (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2)
     dh2dy = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0])**2)
 
     H[:,0:3] = np.array([[dh1dx, dh1dy, 0], [dh2dx, dh2dy, -1.0]])
