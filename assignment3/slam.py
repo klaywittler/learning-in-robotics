@@ -1,4 +1,5 @@
 from __future__ import division
+from scipy.stats import chi2
 import numpy as np
 import slam_utils
 import tree_extraction
@@ -87,24 +88,24 @@ def laser_measurement_model(ekf_state, landmark_id):
                 matrix corresponding to a measurement of the landmark_id'th feature.
     '''
     x = ekf_state['x']
-    xL = x[3 + 2*landmark_id:5 + 2*landmark_id]
+    L = x[3 + 2*landmark_id:5 + 2*landmark_id]
     H = np.zeros((2,3+2*ekf_state['num_landmarks']))
 
-    dh1dx = (x[0]-xL[0])/np.linalg.norm(xL - x[0:2]) 
-    dh1dy = (x[1]-xL[1])/np.linalg.norm(xL - x[0:2])
-    dh2dx = (xL[1]-x[1])/((xL[0]-x[0])**2 + (xL[1]-x[1])**2)
-    dh2dy = -1.0/((1+((xL[1]-x[1])/(xL[0]-x[0]))**2)*(xL[0]-x[0]))
+    dh1dx = (x[0]-L[0])/np.linalg.norm(L - x[0:2])
+    dh1dy = (x[1]-L[1])/np.linalg.norm(L - x[0:2])
+    dh2dx = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*((L[1]-x[1])/(L[0]-x[0])**2) # (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
+    dh2dy = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0])**2) # -1.0/((1.0+((L[1]-x[1])/(L[0]-x[0]))**2)*(L[0]-x[0])) # 
 
     H[:,0:3] = np.array([[dh1dx, dh1dy, 0], [dh2dx, dh2dy, -1.0]])
 
-    dh1dxL = (xL[0]-x[0])/np.linalg.norm(xL - x[0:2])
-    dh1dyL = (xL[1]-x[1])/np.linalg.norm(xL - x[0:2])
-    dh2dxL = (x[1]-xL[1])/((xL[0]-x[0])**2 + (xL[1]-x[1])**2)
-    dh2dyL = 1.0/((1+((xL[1]-x[1])/(xL[0]-x[0]))**2)*(xL[0]-x[0]))
+    dh1dxL = -dh1dx # (L[0]-x[0])/np.linalg.norm(L - x[0:2]) # 
+    dh1dyL = -dh1dy # (L[1]-x[1])/np.linalg.norm(L - x[0:2]) # 
+    dh2dxL = -dh2dx # (x[1]-L[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
+    dh2dyL = -dh2dy # 1.0/((1.0+((L[1]-x[1])/(L[0]-x[0]))**2)*(L[0]-x[0])) # 
 
     H[:,3 + 2*landmark_id:5 + 2*landmark_id ] = np.array([[dh1dxL, dh1dyL], [dh2dxL, dh2dyL]])
 
-    zhat = np.array([np.linalg.norm(xL - x[0:2]), slam_utils.clamp_angle(np.arctan2((xL[1]-x[1]),(xL[0]-x[0])) - x[2])])
+    zhat = np.array([np.linalg.norm(L - x[0:2]), slam_utils.clamp_angle(np.arctan2((L[1]-x[1]),(L[0]-x[0])) - x[2])])
 
     return zhat, H
 
@@ -159,7 +160,7 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
 
         Mpad = np.concatenate((M,B),axis=1)
         C = slam_utils.solve_cost_matrix_heuristic(Mpad)
-        assoc = [-2]*(len(measurements))
+        assoc = [-2]*len(measurements)
         for c in C:
             if c[1] < ekf_state['num_landmarks']:
                 assoc[c[0]] = c[1]
@@ -191,8 +192,7 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
             ekf_state = initialize_landmark(ekf_state, t)
             j = ekf_state['num_landmarks'] - 1
         
-        if j >= 0:
-            x = ekf_state['x']
+        if j >= 0: 
             P = ekf_state['P']
             z = np.array(t[0:2])
             zhat, H = laser_measurement_model(ekf_state, j)
@@ -202,7 +202,7 @@ def laser_update(trees, assoc, ekf_state, sigmas, params):
 
             K = np.matmul(np.matmul(P,H.T),Sinv)
 
-            ekf_state['x'] = x + np.matmul(K,r)
+            ekf_state['x'] = ekf_state['x'] + np.matmul(K,r)
             ekf_state['x'][2] = slam_utils.clamp_angle(ekf_state['x'][2])
             ekf_state['P'] = slam_utils.make_symmetric(np.matmul((np.eye(P.shape[0]) - np.matmul(K,H)),P))
 
@@ -215,7 +215,7 @@ def mahalanobisDist(r,Sinv):
         d = np.matmul(np.matmul(np.transpose(r,axes=(0,2,1)),Sinv[np.newaxis,:,:]),r)
         return d[:,0,0] 
     else:
-        d = np.dot(np.dot(r.T,Sinv),r)
+        d = np.matmul(np.matmul(r.T,Sinv),r)
         return d
 
 
@@ -238,13 +238,13 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
 
     for i, event in enumerate(events):
         t = event[1][0]
-        if i % 250 == 0:
+        if i % 1000 == 0:
             print("t = {}".format(t))
             # print("state size = {}".format(ekf_state['x'].shape))
 
         if event[0] == 'gps':
             gps_msmt = event[1][1:]
-            # ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
+            ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
 
         elif event[0] == 'odo':
             if last_odom_t < 0:
