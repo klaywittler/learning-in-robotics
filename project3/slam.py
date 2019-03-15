@@ -91,19 +91,21 @@ def laser_measurement_model(ekf_state, landmark_id):
     L = x[3 + 2*landmark_id:5 + 2*landmark_id]
     H = np.zeros((2,3+2*ekf_state['num_landmarks']))
 
-    dh1dx = (x[0]-L[0])/np.linalg.norm(L - x[0:2])
-    dh1dy = (x[1]-L[1])/np.linalg.norm(L - x[0:2])
-    dh2dx = (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2)
-    dh2dy =  1.0/((L[0]-x[0])**2 + (L[1]-x[1])**2) # (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0])**2)
+    dh1dx = -(L[0]-x[0])/np.linalg.norm(L - x[0:2])
+    dh1dy = -(L[1]-x[1])/np.linalg.norm(L - x[0:2])
+    dh2dx = (L[1]-x[1])/np.linalg.norm(L - x[0:2])**2 # (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
+    dh2dy = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0]))
 
-    H[:,0:3] = np.array([[dh1dx, dh1dy, 0], [dh2dx, dh2dy, -1.0]])
+    H[:,0:3] = np.array([[dh1dx, dh1dy, 0], 
+                        [dh2dx, dh2dy, -1.0]])
 
     dh1dxL = -dh1dx # (L[0]-x[0])/np.linalg.norm(L - x[0:2]) # 
     dh1dyL = -dh1dy # (L[1]-x[1])/np.linalg.norm(L - x[0:2]) # 
     dh2dxL = -dh2dx # (x[1]-L[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
-    dh2dyL = -dh2dy # 1.0/((1.0+((L[1]-x[1])/(L[0]-x[0]))**2)*(L[0]-x[0])**2) # 
+    dh2dyL = -dh2dy # -(1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0])) # 
 
-    H[:,3 + 2*landmark_id:5 + 2*landmark_id ] = np.array([[dh1dxL, dh1dyL], [dh2dxL, dh2dyL]])
+    H[:,3 + 2*landmark_id:5 + 2*landmark_id ] = np.array([[dh1dxL, dh1dyL], 
+                                                        [dh2dxL, dh2dyL]])
 
     zhat = np.array([np.linalg.norm(L - x[0:2]), slam_utils.clamp_angle(np.arctan2((L[1]-x[1]),(L[0]-x[0])) - x[2])])
 
@@ -164,7 +166,7 @@ def compute_data_association(ekf_state, measurements, sigmas, params):
         for c in C:
             if c[1] < ekf_state['num_landmarks']:
                 assoc[c[0]] = c[1]
-            elif np.min(M[c[0],:]) > 9.21:
+            elif np.min(M[c[0],:]) > 9.21: # 9.21
                 assoc[c[0]] = -1
  
     return assoc
