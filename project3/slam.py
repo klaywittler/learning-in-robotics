@@ -94,7 +94,7 @@ def laser_measurement_model(ekf_state, landmark_id):
     dh1dx = -(L[0]-x[0])/np.linalg.norm(L - x[0:2])
     dh1dy = -(L[1]-x[1])/np.linalg.norm(L - x[0:2])
     dh2dx = (L[1]-x[1])/np.linalg.norm(L - x[0:2])**2 # (L[1]-x[1])/((L[0]-x[0])**2 + (L[1]-x[1])**2) # 
-    dh2dy = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(1.0/(L[0]-x[0]))
+    dh2dy = (1.0/(1.0+((L[1]-x[1])/(L[0]-x[0]))**2))*(-1.0/(L[0]-x[0])**2)
 
     H[:,0:3] = np.array([[dh1dx, dh1dy, 0], 
                         [dh2dx, dh2dy, -1.0]])
@@ -246,7 +246,7 @@ def run_ekf_slam(events, ekf_state_0, vehicle_params, filter_params, sigmas):
 
         if event[0] == 'gps':
             gps_msmt = event[1][1:]
-            # ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
+            ekf_state = gps_update(gps_msmt, ekf_state, sigmas)
 
         elif event[0] == 'odo':
             if last_odom_t < 0:
