@@ -39,8 +39,26 @@ class Tester(object):
         np.ndarray
           The value for the given policy
         """
-        # TODO: Your Code Goes Here
-        return None
+        P = np.zeros([env.nS,env.nS])
+        R = np.zeros([env.nS,env.nS])
+        for state, action in enumerate(policy):
+          for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+              P[state,nextstate] += prob 
+              R[state,nextstate] += r
+
+        v = np.zeros(env.nS)
+        eps = 100
+        i = 0
+        while eps > tol:
+          vOld = v
+          v = np.sum(np.multiply(P,R + gamma*v),axis=1)
+          i += 1
+          if i > max_iterations:
+            break
+
+          eps = np.linalg.norm(v - vOld)
+
+        return v
 
     def policy_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
         """Runs policy iteration.
@@ -72,7 +90,27 @@ class Tester(object):
            improvement iterations, and number of value iterations.
         """
         # TODO:  Your code goes here.
-        return None, None, 0, 0
+        nV = 0
+        policy = np.round(env.nA*np.random.rand(env.nS))
+
+        eps = 100
+        i = 0
+        while eps > tol:
+          vOld = v
+          pOld = policy
+          v = evaluate_policy(self, env, gamma, policy)
+          for state in range(env.nS):
+            for action in range(env.nA):
+              for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+                v[nextstate] = 
+
+          i += 1
+          if i > max_iterations or pOld == policy:
+            break
+
+          eps = np.linalg.norm(v - vOld)
+        
+        return policy, v, i, nV
 
     def value_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
         """Runs value iteration for a given gamma and environment.
@@ -99,8 +137,34 @@ class Tester(object):
         np.ndarray, iteration
           The value function and the number of iterations it took to converge.
         """
-        # TODO: Your Code goes here.
-        return None, None
+        P = np.zeros([env.nS,env.nS,env.nA])
+        R = np.zeros([env.nS,env.nS,env.nA])
+        for action in range(env.nA):
+          for state in range(env.nS):
+            for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+              P[state,nextstate,action] += prob 
+              R[state,nextstate,action] += r
+
+        v = np.zeros(env.nS)
+        eps = 100
+        i = 0
+        while eps > tol:
+          vOld = v
+
+          for action in range(env.nA):
+            if action > 0:
+              v = np.sum(np.multiply(P[:,:,action],R[:,:,action] + gamma*v),axis=1)
+              v = np.maximum(vA,v)
+            else:
+              vA = np.sum(np.multiply(P[:,:,action],R[:,:,action] + gamma*v),axis=1)
+
+          i += 1
+          if i > max_iterations:
+            break
+
+          eps = np.linalg.norm(v - vOld)
+
+        return v, i
 
     def policy_gradient_test(self, state):
         """
