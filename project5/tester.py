@@ -89,20 +89,29 @@ class Tester(object):
            Returns optimal policy, value function, number of policy
            improvement iterations, and number of value iterations.
         """
-        # TODO:  Your code goes here.
         nV = 0
         policy = np.round(env.nA*np.random.rand(env.nS))
+
+        P = np.zeros([env.nS,env.nS,env.nA])
+        R = np.zeros([env.nS,env.nS,env.nA])
+        for action in range(env.nA):
+          for state in range(env.nS):
+            for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+              P[state,nextstate,action] += prob 
+              R[state,nextstate,action] += r
 
         eps = 100
         i = 0
         while eps > tol:
           vOld = v
           pOld = policy
+          q = np.zeros(env.nA)
           v = evaluate_policy(self, env, gamma, policy)
           for state in range(env.nS):
             for action in range(env.nA):
               for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-                v[nextstate] = 
+                q[action] += np.sum(np.multiply(P[state,nextstate,action],R[state,nextstate,action] + gamma*v[nextstate]),axis=1)
+            policy[state] = np.argmax(q)
 
           i += 1
           if i > max_iterations or pOld == policy:
