@@ -47,16 +47,12 @@ class Tester(object):
               R[state,nextstate] += r
 
         v = np.zeros(env.nS)
-        eps = 100
-        i = 0
-        while eps > tol:
+        for i in range(max_iterations):
           vOld = v
           v = np.sum(np.multiply(P,R + gamma*v),axis=1)
-          i += 1
-          if i > max_iterations:
-            break
-
           eps = np.linalg.norm(v - vOld)
+          if eps < tol:
+            break
 
         return v
 
@@ -90,7 +86,7 @@ class Tester(object):
            improvement iterations, and number of value iterations.
         """
         nV = 0
-        policy = np.round(env.nA*np.random.rand(env.nS))
+        policy = np.random.randint(env.nA, size= env.nS)
 
         P = np.zeros([env.nS,env.nS,env.nA])
         R = np.zeros([env.nS,env.nS,env.nA])
@@ -100,25 +96,18 @@ class Tester(object):
               P[state,nextstate,action] += prob 
               R[state,nextstate,action] += r
 
-        eps = 100
-        i = 0
-        while eps > tol:
+        v = np.zeros(env.nS)
+        for i in range(max_iterations):
           vOld = v
           pOld = policy
-          q = np.zeros(env.nA)
-          v = evaluate_policy(self, env, gamma, policy)
-          for state in range(env.nS):
-            for action in range(env.nA):
-              for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-                q[action] += np.sum(np.multiply(P[state,nextstate,action],R[state,nextstate,action] + gamma*v[nextstate]),axis=1)
-            policy[state] = np.argmax(q)
-
-          i += 1
-          if i > max_iterations or pOld == policy:
-            break
+          v = Tester.evaluate_policy(self, env, gamma, policy)
+          q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
+          policy = np.argmax(q,axis=1)
 
           eps = np.linalg.norm(v - vOld)
-        
+          if eps < tol or np.array_equal(pOld,policy):
+            break
+
         return policy, v, i, nV
 
     def value_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
@@ -155,23 +144,14 @@ class Tester(object):
               R[state,nextstate,action] += r
 
         v = np.zeros(env.nS)
-        eps = 100
-        i = 0
-        while eps > tol:
+        for i in range(max_iterations):
           vOld = v
-
-          for action in range(env.nA):
-            if action > 0:
-              v = np.sum(np.multiply(P[:,:,action],R[:,:,action] + gamma*v),axis=1)
-              v = np.maximum(vA,v)
-            else:
-              vA = np.sum(np.multiply(P[:,:,action],R[:,:,action] + gamma*v),axis=1)
-
-          i += 1
-          if i > max_iterations:
-            break
-
+          vA = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
+          v = np.amax(vA,axis=1)
           eps = np.linalg.norm(v - vOld)
+
+          if eps < tol:
+            break
 
         return v, i
 
