@@ -9,6 +9,8 @@ class Tester(object):
         Initialize the Tester object by loading your model.
         """
         # TODO: Load your pyTorch model for Policy Gradient here.
+        # self.model = torch.load('model.pt')
+        # self.model.eval()
         pass
 
 
@@ -100,7 +102,7 @@ class Tester(object):
         for i in range(max_iterations):
           vOld = v
           pOld = policy
-          v = Tester.evaluate_policy(self, env, gamma, policy)
+          v = self.evaluate_policy(env, gamma, policy)
           q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
           policy = np.argmax(q,axis=1)
 
