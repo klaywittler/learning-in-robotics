@@ -56,7 +56,7 @@ class Tester(object):
           if eps < tol:
             break
 
-        return v
+        return v, i
 
     def policy_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
         """Runs policy iteration.
@@ -102,10 +102,11 @@ class Tester(object):
         for i in range(max_iterations):
           vOld = v
           pOld = policy
-          v = self.evaluate_policy(env, gamma, policy)
+          v, c = self.evaluate_policy(env, gamma, policy)
           q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
           policy = np.argmax(q,axis=1)
 
+          nV += c
           eps = np.linalg.norm(v - vOld)
           if eps < tol or np.array_equal(pOld,policy):
             break
