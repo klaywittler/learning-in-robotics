@@ -3,8 +3,40 @@ import math as m
 import gym
 from gym import spaces
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 import lake_env
 from tester import Tester
+
+class Policy(nn.Module):
+    def __init__(self):
+        super(Policy, self).__init__()
+        self.state_space = env.observation_space.shape[0]
+        self.action_space = env.action_space.n
+        self.l1 = nn.Linear(self.state_space, 128, bias=False)
+        self.l2 = nn.Linear(128,self.action_space, bias=False)
+
+        self.gamma = gamma
+
+        # Episode policy and reward history
+        self.policy_history = Variable(torch.Tensor())
+        self.reward_episode = []
+        # Overall loss and reward history
+        self.reward_history = []
+        self.loss_history = []
+    def forward(self, x):
+        model = torch.nn.Sequential(
+            self.l1,
+            nn.Dropout(p=0.6),
+            nn.ReLu(),
+            self.l2,
+            nn.ReLu())
+        return model(x)
+
+
+def select_Action(state)
+
 
 def policy_improvement(env,gamma,policy,v):
   P = np.zeros([env.nS,env.nS,env.nA])
@@ -17,12 +49,6 @@ def policy_improvement(env,gamma,policy,v):
   
   q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
   policy = np.argmax(q,axis=1)
-
-  # for state in range(env.nS):
-  #   q = np.zeros(env.nA)
-  #   for action in range(env.nA):
-  #     q = np.sum(np.multiply(P[state,:,action],R[state,:,action] + gamma*v))
-  #   policy[state] = np.argmax(q)
   return policy
 
 
@@ -69,8 +95,8 @@ for i_episode in range(episodes):
           if done:
               break
               
-
-
+# net = Net()
+# https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html#sphx-glr-beginner-blitz-neural-networks-tutorial-py
 gamma = 0.9
 
 tester = Tester()
