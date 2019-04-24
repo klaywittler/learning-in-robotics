@@ -157,7 +157,7 @@ class Tester(object):
           vOld = v
           vA = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
           v = np.amax(vA,axis=1)
-          eps = np.linalg.norm(v - vOld)
+          eps = np.linalg.norm(v - vOld, np.inf)
 
           if eps < tol:
             break
@@ -192,9 +192,8 @@ class Tester(object):
         """
         state = torch.from_numpy(state).float()
         prob_action = self.model(Variable(state))
-        c = Categorical(prob_action)
-        action = c.sample()
-        action = np.array([action.data.item()])
+        prob, action = prob_action.max(0)
+        action = action.numpy()
         return action
 
 
@@ -211,17 +210,22 @@ class Policy(nn.Module):
         self.gamma = 0.99
 
         # Episode policy and reward history
-        self.policy_history = torch.tensor(-9999) # Variable(torch.Tensor())
+        self.policy_history = Variable(torch.Tensor())
         self.reward_episode = []
         # Overall loss and reward history
         self.reward_history = []
         self.loss_history = []
     def forward(self, x):
-        model = torch.nn.Sequential(
-            self.l1,
-            nn.Dropout(p=0.6),
-            nn.ReLU(),
-            self.l2,
-            nn.Softmax(dim=-1)
-            )
-        return model(x)
+        x = self.l1(x)
+        x = F.dropout(x, training=self.training)
+        x = F.relu(x)
+        x = self.l2(x)
+        return F.log_softmax(x,dim=-1)
+        # model = torch.nn.Sequential(
+        #     self.l1,
+        #     nn.Dropout(p=0.6),
+        #     nn.ReLU(),
+        #     self.l2,
+        #     nn.Softmax(dim=-1)
+        #     )
+        # return model(x)

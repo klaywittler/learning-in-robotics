@@ -16,7 +16,7 @@ if __name__ == '__main__':
     env = gym.make('Stochastic-4x4-FrozenLake-v0')
     tester = Tester()
 
-    gamma = 0.9
+    gamma = 0.99
     [v, i] = tester.value_iteration(env, gamma)
     policy = tester.policy_selection(env,gamma,v)
     print(v,i)

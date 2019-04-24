@@ -11,7 +11,7 @@ import lake_env
 from tester import *
 
 
-def main(episodes=1000,steps=1000):
+def main(episodes=1500,steps=1000):
     running_reward = 10
     for episode in range(episodes):
         state = env.reset()
@@ -40,13 +40,8 @@ def select_action(state):
     state = torch.from_numpy(state).float()
     prob_action = policy(Variable(state))
     c = Categorical(prob_action)
-    action = c.sample()
-
-    if policy.policy_history.dim() != 0:
-        log_probA = torch.tensor([c.log_prob(action)],requires_grad=True)
-        policy.policy_history = torch.cat([policy.policy_history, log_probA])
-    else:
-        policy.policy_history = torch.tensor([c.log_prob(action)],requires_grad=True)
+    action = torch.tensor([c.sample()])
+    policy.policy_history = torch.cat([policy.policy_history, c.log_prob(action)])
     return action
 
 
@@ -67,7 +62,6 @@ def update_policy():
     loss = torch.sum(torch.mul(policy.policy_history, Variable(rewards)).mul(-1), -1)
 
     # Update network weights
-    optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
@@ -75,7 +69,7 @@ def update_policy():
     # Save and intialize episode history counters
     policy.loss_history.append(loss.data.item())
     policy.reward_history.append(np.sum(policy.reward_episode))
-    policy.policy_history = torch.tensor(-9999)
+    policy.policy_history = Variable(torch.Tensor())
     policy.reward_episode = []
 
 
@@ -84,18 +78,20 @@ if __name__ == '__main__':
     ###################
     # Policy Gradient #
     ###################
-    # print(torch.tensor(1).dim())
+
+    #### Training ####
     gamma = 0.99
     LR = 0.01 # learning rate
     env = gym.make('CartPole-v0')
     options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
     policy = Policy(options)
+    optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
     main()
     torch.save(policy.state_dict(),'CartPolePolicy.pt')
     env.close()
 
 
-    ####
+    #### Testing ####
     env = gym.make('CartPole-v0')
     tester = Tester()
     episodes = 1
@@ -108,7 +104,7 @@ if __name__ == '__main__':
 
             action = tester.policy_gradient_test(state)
 
-            state, reward, done, _ = env.step(action[0])
+            state, reward, done, _ = env.step(action)
             if done: 
                 break
 

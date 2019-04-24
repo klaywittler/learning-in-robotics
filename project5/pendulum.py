@@ -12,8 +12,6 @@ class Model(nn.Module):
         super(Model, self).__init__()
         # self.state_space = env.observation_space.shape[0]
         # self.action_space = env.action_space.shape[0]
-        self.state_space = 4
-        self.action_space = 1
         self.l1 = nn.Linear(5, 128)
         self.l2 = nn.Linear(128,4)
     def forward(self, x):
