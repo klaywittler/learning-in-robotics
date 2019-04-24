@@ -1,18 +1,21 @@
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
+from torch.distributions import *
 import gym
 
 class Tester(object):
-
     def __init__(self):
         """
         Initialize the Tester object by loading your model.
         """
         # TODO: Load your pyTorch model for Policy Gradient here.
-        # self.model = torch.load('model.pt')
-        # self.model.eval()
-
-        pass
+        options = {'state_space':4,'action_space':2}
+        self.model = Policy(options)
+        self.model.load_state_dict(torch.load('CartPolePolicy.pt'))
+        self.model.eval()
 
 
     def evaluate_policy(self, env, gamma, policy, max_iterations=int(1e3), tol=1e-3):
@@ -162,7 +165,7 @@ class Tester(object):
         return v, i
 
 
-    def policy_selection(env,gamma,policy,v):
+    def policy_selection(self,env,gamma,v):
         P = np.zeros([env.nS,env.nS,env.nA])
         R = np.zeros([env.nS,env.nS,env.nA])
         for action in range(env.nA):
@@ -187,5 +190,38 @@ class Tester(object):
         np.ndarray
             The action in this state according to the trained policy.
         """
-        # TODO. Your Code goes here.
-        return 0
+        state = torch.from_numpy(state).float()
+        prob_action = self.model(Variable(state))
+        c = Categorical(prob_action)
+        action = c.sample()
+        action = np.array([action.data.item()])
+        return action
+
+
+class Policy(nn.Module):
+    def __init__(self, options):
+        super(Policy, self).__init__()
+        self.options = options
+        self.state_space = self.options['state_space']
+        self.action_space = self.options['action_space']
+        self.l1 = nn.Linear(self.state_space, 128, bias=False)
+        self.l2 = nn.Linear(128,self.action_space, bias=False)
+
+        # self.gamma = options['gamma']
+        self.gamma = 0.99
+
+        # Episode policy and reward history
+        self.policy_history = torch.tensor(-9999) # Variable(torch.Tensor())
+        self.reward_episode = []
+        # Overall loss and reward history
+        self.reward_history = []
+        self.loss_history = []
+    def forward(self, x):
+        model = torch.nn.Sequential(
+            self.l1,
+            nn.Dropout(p=0.6),
+            nn.ReLU(),
+            self.l2,
+            nn.Softmax(dim=-1)
+            )
+        return model(x)
