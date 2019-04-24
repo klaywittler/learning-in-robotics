@@ -11,6 +11,7 @@ class Tester(object):
         # TODO: Load your pyTorch model for Policy Gradient here.
         # self.model = torch.load('model.pt')
         # self.model.eval()
+
         pass
 
 
@@ -57,6 +58,7 @@ class Tester(object):
             break
 
         return v, i
+
 
     def policy_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
         """Runs policy iteration.
@@ -113,6 +115,7 @@ class Tester(object):
 
         return policy, v, i, nV
 
+
     def value_iteration(self, env, gamma, max_iterations=int(1e3), tol=1e-3):
         """Runs value iteration for a given gamma and environment.
 
@@ -157,6 +160,21 @@ class Tester(object):
             break
 
         return v, i
+
+
+    def policy_selection(env,gamma,policy,v):
+        P = np.zeros([env.nS,env.nS,env.nA])
+        R = np.zeros([env.nS,env.nS,env.nA])
+        for action in range(env.nA):
+            for state in range(env.nS):
+                for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+                    P[state,nextstate,action] += prob  
+                    R[state,nextstate,action] += r
+
+        q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
+        policy = np.argmax(q,axis=1)
+        return policy
+
 
     def policy_gradient_test(self, state):
         """

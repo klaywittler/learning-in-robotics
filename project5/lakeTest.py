@@ -5,20 +5,21 @@ from gym import spaces
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.autograd import Variable
 import lake_env
 from tester import Tester
 
-class Policy(nn.Module):
+class policy(nn.Module):
     def __init__(self):
-        super(Policy, self).__init__()
-        self.state_space = env.observation_space.shape[0]
+        super(policy, self).__init__()
+        self.state_space = env.observation_space.n
         self.action_space = env.action_space.n
         self.l1 = nn.Linear(self.state_space, 128, bias=False)
         self.l2 = nn.Linear(128,self.action_space, bias=False)
 
-        self.gamma = gamma
+        self.gamma = options['gamma']
 
+        self.gamma = 0.9
         # Episode policy and reward history
         self.policy_history = Variable(torch.Tensor())
         self.reward_episode = []
@@ -35,80 +36,124 @@ class Policy(nn.Module):
         return model(x)
 
 
-def select_Action(state)
+def main(episodes=4,steps=100):
+    running_reward = 1
+    for episode in range(episodes):
+        state = env.reset()
+        done = False
+        for time in range(steps):
+            action = select_action(state)
+
+            state, reward, done, _ = env.step(action.data[0])
+            policy.reward_episode.append(reward)
+            if done: 
+                break
+
+        running_reward = (running_reward*0.99) + (time*0.01)
+
+        update_policy()
+
+        if episode % 50 == 0:
+            print('Episode {}\tLst length: {:5d}\tAverage length: {:0.2f}'.format(episode, time, running_reward))
+        if running_reward > end.spec.reward_threshold:
+            print('Solved! Running reward is now {} and the last episode runs to {} time steps'.format(running_reward, time))
+            break
+
+def select_action(state):
+    state = torch.from_numpy(state).type(torch.FloatTensor)
+    state = policy(Variable(state))
+    c = Categorical(state)
+    actoin = c.sample()
+
+    if policy.policy_history.dim() != 0:
+        policy.policy_history = torch.cat([policy.policy_gistory, c.log_prob(action)])
+    else:
+        policy.policy_history = (c.log_prob(action))
+    return action
+
+def update_policy():
+    R = 0
+    rewards = []
+
+    # Discount future rewards back to present using gamma
+    for r in policy.reward_episode[::-1]:
+        R = r + policy.gamma * R
+        rewards.inter(0,R)
+
+    # Scale rewards    
+    rewards = torch.FloatTensor(rewards)
+    rewards = (rewards - rewards.mean())/(rewards.std() + np.finfo(npfloat32).eps)
+
+    # Calculate loss 
+    loss = (torch.sum(torch.mul(policy.policy_history, Variable(rewards)).mul(-1), -1))
+
+    # Update network weights
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    # SAve and intialize episode history counters
+    policy.loss_history.append(loss.data[0])
+    policy.reward_history.append(np.sum(policy.reward_episode))
+    policy.policy_history = Variable(torch.Tensor())
+    policy.reward_episode = []
 
 
-def policy_improvement(env,gamma,policy,v):
-  P = np.zeros([env.nS,env.nS,env.nA])
-  R = np.zeros([env.nS,env.nS,env.nA])
-  for action in range(env.nA):
-    for state in range(env.nS):
-      for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-        P[state,nextstate,action] += prob  
-        R[state,nextstate,action] += r
-  
-  q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
-  policy = np.argmax(q,axis=1)
-  return policy
+def getData(episodes=10,steps=1000):
+    inputs = np.zeros([episodes*steps,5])
+    labels = np.zeros([episodes*steps,4])
 
-
-# def get_trainingData(episodes=10,goal_steps=1000):
-#     training_data = np.empty(9)
-
-#     for i_episode in range(episodes):
-#         observation = env.reset()
-#         print(observation)
-#         for t in range(goal_steps):
-#             # env.render()
-#             action = env.action_space.sample()
-#             print(action)
-#             observation, reward, done, info = env.step(action)
+    for episode in range(episodes):
+        observation = env.reset()
+        # state vector:[ cos(theta)   ,  sin(theta)   ,  theta                , theta dot     ]
+        s0 = np.array([observation[0], observation[1], m.acos(observation[0]), observation[2]])
+        for t in range(steps):
+            # env.render()
+            action = env.action_space.sample()
+            inputs[(episode*steps)+t,:] = np.hstack((s0,action))
+            observation, reward, done, info = env.step(action)
             
-#             if done:
-#                 break
-                
-#     env.close()
-#     # training_data = np.delete(training_data,0,axis=0)
-    # return 0
+            s1 = np.array([observation[0], observation[1], m.acos(observation[0]), observation[2]])
+            labels[(episode*steps)+t,:] = s1
+            s0 = s1
 
-# def training():
-
+    env.close()
+    training_data = {'inputs':inputs, 'labels':labels}
+    return training_data
 
 
+if __name__ == '__main__':
+    # # P : s a probability reward, terminal
+    ###################
+    # Policy Gradient #
+    ###################
+    gamma = 0.9
+    episodes = 10
+    steps = 10
+    # env = gym.make('Stochastic-4x4-FrozenLake-v0')
+    env = gym.make('CartPole-v0')
+    env.reset()
+    env.render()
+    main()
+    # torch.save(model,'model.pt')
+     
+    # https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html#sphx-glr-beginner-blitz-neural-networks-tutorial-py
+    
 
-#   torch.save(model,'model.pt')
 
-episodes = 10
-goal_steps = 10
-# P : s a probability reward, terminal
-env = gym.make('Stochastic-4x4-FrozenLake-v0')
-env.render()
-for i_episode in range(episodes):
-      observation = env.reset()
-      # print(observation)
-      for t in range(goal_steps):
-          # env.render()
-          action = env.action_space.sample()
-          print(action)
-          observation, reward, done, info = env.step(action)
-          
-          if done:
-              break
-              
-# net = Net()
-# https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html#sphx-glr-beginner-blitz-neural-networks-tutorial-py
-gamma = 0.9
+    ##############################
+    # Policy Iteration/Value #
+    ##############################
+    # tester = Tester()
 
-tester = Tester()
+    # [v, i] = tester.value_iteration(env, gamma)
+    # policy = policy = np.random.randint(env.nA, size= env.nS)
+    # policy = tester.policy_selection(env,gamma,policy,v)
+    # print(v,i)
+    # print(policy)
 
-[v, i] = tester.value_iteration(env, gamma)
-policy = policy = np.random.randint(env.nA, size= env.nS)
-policy = policy_improvement(env,gamma,policy,v)
-print(v,i)
-print(policy)
+    # policy, v, c, nv = tester.policy_iteration(env, gamma)
+    # print(v, c, nv)
+    # print(policy)
 
-policy, v, c, nv = tester.policy_iteration(env, gamma)
-print(v, c, nv)
-print(policy)
-
-env.close()
+    # env.close()
