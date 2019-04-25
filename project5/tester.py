@@ -56,7 +56,7 @@ class Tester(object):
         for i in range(max_iterations):
           vOld = v
           v = np.sum(np.multiply(P,R + gamma*v),axis=1)
-          eps = np.linalg.norm(v - vOld)
+          eps = np.linalg.norm(v - vOld, np.inf)
           if eps < tol:
             break
 
@@ -112,7 +112,7 @@ class Tester(object):
           policy = np.argmax(q,axis=1)
 
           nV += c
-          eps = np.linalg.norm(v - vOld)
+          eps = np.linalg.norm(v - vOld, np.inf)
           if eps < tol or np.array_equal(pOld,policy):
             break
 
@@ -216,16 +216,16 @@ class Policy(nn.Module):
         self.reward_history = []
         self.loss_history = []
     def forward(self, x):
-        x = self.l1(x)
-        x = F.dropout(x, training=self.training)
-        x = F.relu(x)
-        x = self.l2(x)
-        return F.log_softmax(x,dim=-1)
-        # model = torch.nn.Sequential(
-        #     self.l1,
-        #     nn.Dropout(p=0.6),
-        #     nn.ReLU(),
-        #     self.l2,
-        #     nn.Softmax(dim=-1)
-        #     )
-        # return model(x)
+        # x = self.l1(x)
+        # x = F.dropout(x, training=self.training)
+        # x = F.relu(x)
+        # x = self.l2(x)
+        # return F.log_softmax(x,dim=-1)
+        model = torch.nn.Sequential(
+            self.l1,
+            nn.Dropout(p=0.6),
+            nn.ReLU(),
+            self.l2,
+            nn.Softmax(dim=-1)
+            )
+        return model(x)
