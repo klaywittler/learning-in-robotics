@@ -25,7 +25,7 @@ def main(episodes=1500,steps=1000):
             if done: 
                 break
 
-        running_reward = (running_reward*0.99) + (time*0.01)
+        running_reward = (running_reward*gamma) + (time*0.01)
 
         update_policy()
 
@@ -80,32 +80,33 @@ if __name__ == '__main__':
     ###################
 
     #### Training ####
-    gamma = 0.99
-    LR = 0.01 # learning rate
-    env = gym.make('CartPole-v0')
-    options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
-    policy = Policy(options)
-    optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
-    main()
-    torch.save(policy.state_dict(),'CartPolePolicy.pt')
-    env.close()
+    # gamma = 0.99
+    # LR = 0.01 # learning rate
+    # env = gym.make('CartPole-v1')
+    # options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
+    # policy = Policy(options)
+    # optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
+    # main()
+    # torch.save(policy.state_dict(),'CartPolePolicy.pt')
+    # env.close()
 
 
     #### Testing ####
-    env = gym.make('CartPole-v0')
+    env = gym.make('CartPole-v1')
     tester = Tester()
-    episodes = 1
+    episodes = 400
     steps = 1000
     for episode in range(episodes):
         state = env.reset()
         done = False
         for time in range(steps):
-            env.render()
+            # env.render()
 
             action = tester.policy_gradient_test(state)
 
             state, reward, done, _ = env.step(action)
-            if done: 
+            if done:
+                print(time)
                 break
 
     env.close() 

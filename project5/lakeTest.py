@@ -17,12 +17,12 @@ if __name__ == '__main__':
     tester = Tester()
 
     gamma = 0.99
-    [v, i] = tester.value_iteration(env, gamma)
+    [v, i] = tester.value_iteration(env, gamma,tol=0)
     policy = tester.policy_selection(env,gamma,v)
     print(v,i)
     print(policy)
 
-    policy, v, c, nv = tester.policy_iteration(env, gamma)
+    policy, v, c, nv = tester.policy_iteration(env, gamma,tol=0)
     print(v, c, nv)
     print(policy)
 

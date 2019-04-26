@@ -48,17 +48,17 @@ class Tester(object):
         P = np.zeros([env.nS,env.nS])
         R = np.zeros([env.nS,env.nS])
         for state, action in enumerate(policy):
-          for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-              P[state,nextstate] += prob 
-              R[state,nextstate] += r
+            for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+                P[state,nextstate] += prob 
+                R[state,nextstate] += r
 
         v = np.zeros(env.nS)
         for i in range(max_iterations):
-          vOld = v
-          v = np.sum(np.multiply(P,R + gamma*v),axis=1)
-          eps = np.linalg.norm(v - vOld, np.inf)
-          if eps < tol:
-            break
+            vOld = v
+            v = np.sum(np.multiply(P,R + gamma*v),axis=1)
+            eps = np.linalg.norm(v - vOld, np.inf)
+            if eps < tol:
+                break
 
         return v, i
 
@@ -98,23 +98,26 @@ class Tester(object):
         P = np.zeros([env.nS,env.nS,env.nA])
         R = np.zeros([env.nS,env.nS,env.nA])
         for action in range(env.nA):
-          for state in range(env.nS):
-            for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-              P[state,nextstate,action] += prob 
-              R[state,nextstate,action] += r
+            for state in range(env.nS):
+                for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+                    P[state,nextstate,action] += prob 
+                    R[state,nextstate,action] += r
 
         v = np.zeros(env.nS)
-        for i in range(max_iterations):
-          vOld = v
-          pOld = policy
-          v, c = self.evaluate_policy(env, gamma, policy)
-          q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
-          policy = np.argmax(q,axis=1)
+        i = 0
+        converged = False
+        while not converged:
+            vOld = v
+            pOld = policy
+            v, c = self.evaluate_policy(env, gamma, policy,max_iterations,tol)
+            q = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
+            policy = np.argmax(q,axis=1)
 
-          nV += c
-          eps = np.linalg.norm(v - vOld, np.inf)
-          if eps < tol or np.array_equal(pOld,policy):
-            break
+            nV += c
+            i += 1
+            if np.array_equal(pOld,policy):
+                converged = True
+                break
 
         return policy, v, i, nV
 
@@ -147,20 +150,20 @@ class Tester(object):
         P = np.zeros([env.nS,env.nS,env.nA])
         R = np.zeros([env.nS,env.nS,env.nA])
         for action in range(env.nA):
-          for state in range(env.nS):
-            for (prob, nextstate, r, is_terminal) in env.P[state][action]:
-              P[state,nextstate,action] += prob 
-              R[state,nextstate,action] += r
+            for state in range(env.nS):
+                for (prob, nextstate, r, is_terminal) in env.P[state][action]:
+                    P[state,nextstate,action] += prob 
+                    R[state,nextstate,action] += r
 
         v = np.zeros(env.nS)
         for i in range(max_iterations):
-          vOld = v
-          vA = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
-          v = np.amax(vA,axis=1)
-          eps = np.linalg.norm(v - vOld, np.inf)
+            vOld = v
+            vA = np.sum(np.multiply(P,R + gamma*np.repeat(v[:,np.newaxis],env.nA,axis=1)),axis=1)
+            v = np.amax(vA,axis=1)
+            eps = np.linalg.norm(v - vOld, np.inf)
 
-          if eps < tol:
-            break
+            if eps < tol:
+                break
 
         return v, i
 

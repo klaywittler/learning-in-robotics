@@ -21,8 +21,7 @@ class Model(nn.Module):
             self.l1,
             nn.Dropout(p=0.6),
             nn.ReLU(),
-            self.l2,
-            nn.ReLU())
+            self.l2)
         return model(x)
 
 
@@ -82,7 +81,8 @@ class Trainer(object):
         else:
             self.model = Model().to(self.device)
         # define loss function and optimizer
-        self.loss = torch.nn.MSELoss().to(self.device) # for Global loss
+        self.loss = torch.nn.MSELoss(reduction='sum').to(self.device) # for Global loss
+        self.testLoss = torch.nn.MSELoss().to(self.device) # for Global loss
         self.optimizer = torch.optim.Adam(self.model.parameters(),lr = options['lr'])
 
         self.train_inputs = torch.from_numpy(options['training_data']['inputs']).float()
@@ -94,19 +94,19 @@ class Trainer(object):
         self.test_ds = PendulumData(self.test_inputs,self.test_labels)
 
         self.train_data_loader = DataLoader(self.train_ds, **options['params'])
-        self.test_data_loader = DataLoader(self.test_ds, **options['params'])
+        self.test_data_loader = DataLoader(self.test_ds)
 
         self.train_loss = []
         self.test_loss = []
 
     def train(self):
-        self.total_step_count = 0
         start_time = time()
         for epoch in range(1,self.options['num_epochs']+1):
             elapsed_time = time() - start_time
             seconds_per_epoch = elapsed_time / epoch
             remaining_time = (self.options['num_epochs'] - epoch) * seconds_per_epoch
 
+            epoch_loss = 0
             print("Epoch %d/%d - Elapsed Time %f - Remaining Time %f" %
                     (epoch, self.options['num_epochs'],
                         elapsed_time, remaining_time))
@@ -118,16 +118,19 @@ class Trainer(object):
                 loss = self.loss(pred[-1], local_labels)
                 loss.backward()
                 self.optimizer.step()
-                self.train_loss.append(loss)
+                epoch_loss += loss
+
+            self.train_loss.append(epoch_loss/len(self.train_data_loader.dataset))
 
     def test(self):
         for local_batch, local_labels in self.test_data_loader:           
             self.model.eval()
             with torch.no_grad():
                 pred = self.model(local_batch)
-                print(pred)
-                loss = self.loss(pred[-1], local_labels)
+                loss = self.testLoss(pred[-1], local_labels)
                 self.test_loss.append(loss)
+                print("pred:",pred)
+                print("label: ", local_labels)
 
 def getData(episodes=1000,steps=1000,shuffle=False, render=False):
     inputs = np.zeros([episodes*steps,5])
@@ -216,40 +219,42 @@ if __name__ == '__main__':
     observation = env.reset()
 
     # initialization variables
-    model = 'LSTM'
+    model = 'FC'
     params = {'batch_size': 1,
-            'shuffle': True,
+            'shuffle': False,
             'num_workers':6}
     LR = 1e-3 # learning rate
-    num_epochs = 5 # number of times data is seen
-    games = 100 # how many games
+    num_epochs = 40 # number of times data is seen
+    games = 10 # how many games
     steps = 100 # how long each game runs
     test_games = 1 # how test games
     test_steps = 500 # how long each test game runs
     
-    # training_data = getData(games,steps,params['shuffle'])
-    # np.save('saved_training_data0.npy',training_data)
+    training_data = getData(games,steps,params['shuffle'],False)
+    np.save('saved_training_data0.npy',training_data)
 
-    # testing_data = getData(games,steps,False)
-    # np.save('saved_testing_data0.npy',testing_data)
+    testing_data = getData(test_games,test_steps,False,False)
+    np.save('saved_testing_data0.npy',testing_data)
 
-    print(np.zeros(2))
+    # print(np.zeros(2))
 
-    # options = {'model':model,'lr':LR, 'num_epochs':num_epochs,'training_data':training_data,'testing_data': testing_data,'params':params}
-    # trainer = Trainer(options)
-    # trainer.train()
-    # trainer.test()
+    options = {'model':model,'lr':LR, 'num_epochs':num_epochs,'training_data':training_data,'testing_data': testing_data,'params':params}
+    trainer = Trainer(options)
+    trainer.train()
+    trainer.test()
 
-    # # simulation(trainer.model)
+    # print(trainer.test_loss)
+    # print(trainer.train_loss)
+    # simulation(trainer.model)
 
-    # plt.close('all')
-    # fig, axs = plt.subplots(2, 1)
-    # axs[0].plot(trainer.train_loss)
-    # axs[0].set_ylabel('training loss')
-    # axs[1].plot(trainer.test_loss)
-    # axs[1].set_ylabel('testing loss')
-    # fig.tight_layout()
-    # plt.show()
+    plt.close('all')
+    fig, axs = plt.subplots(2, 1)
+    axs[0].plot(trainer.train_loss)
+    axs[0].set_ylabel('training loss')
+    axs[1].plot(trainer.test_loss)
+    axs[1].set_ylabel('testing loss')
+    fig.tight_layout()
+    plt.show()
 
 
     
