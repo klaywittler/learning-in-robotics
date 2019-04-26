@@ -125,6 +125,7 @@ class Trainer(object):
             self.model.eval()
             with torch.no_grad():
                 pred = self.model(local_batch)
+                print(pred)
                 loss = self.loss(pred[-1], local_labels)
                 self.test_loss.append(loss)
 
@@ -155,7 +156,11 @@ def getData(episodes=1000,steps=1000,shuffle=False, render=False):
     return training_data
 
 
-def Astar(model, n_theta = 35, n_dtheta = 35, n_u = 35):
+def Astar(map, start):
+    # parent = np.nan()
+    pass
+
+def getCostMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     theta_lower = -m.pi
     theta_upper = m.pi
     dtheta_lower = -8
@@ -175,11 +180,12 @@ def Astar(model, n_theta = 35, n_dtheta = 35, n_u = 35):
         for dtheta in dtheta_space:
             a = 0
             for action in action_space:
-                sa0 = np.array([m.cos(theta), m.sin(theta), theta, dtheta, action])
-                predict_state = model.predict(sa0.reshape(-1,len(sa0)))
+                sa0 = torch.tensor([np.cos(theta), np.sin(theta), theta, dtheta, action])
+                predict_state = model(sa0)
+
                 # heuristic
-                h = -(predict_state[0][2]**2 + predict_state[0][3]**2 + 0.001*action**2)
-                g = -abs(predict_state[0][2]) #-abs(predict_state[0][3])
+                h = -(predict_state[2]**2 + predict_state[3]**2 + 0.001*action**2)
+                g = -abs(action) #-abs(predict_state[0][3])
                 cost[t,dt,a] = h + g
                 a += 1
             dt += 1
@@ -188,17 +194,16 @@ def Astar(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     return [cost, theta_space, dtheta_space, action_space]
 
 def simulation(model,games=1,steps=1000):
-    [cost, theta_space, dtheta_space, action_space] = get_costMap(model)
+    [cost, theta_space, dtheta_space, action_space] = getCostMap(model)
     for i_episode in range(games):
         observation = env.reset()
         for t in range(steps):
-            # env.render()
-            theta = m.acos(observation[0]) 
+            env.render()
+            theta = np.arctan2(observation[1],observation[0]) 
             dtheta = observation[2]
-            t = np.where(theta_space>=theta) 
-            dt = np.where(dtheta_space>=dtheta)
-            a = Astar(model,theta,dtheta)
-            a = cost[t[0][0],dt[0][0],:].argmax()
+            th = np.where(theta_space>=theta) 
+            dth = np.where(dtheta_space>=dtheta)
+            a = cost[th[0][0],dth[0][0],:].argmax()
             action = [action_space[a]]
             print(action)
             observation, reward, done, info = env.step(action)
@@ -211,8 +216,8 @@ if __name__ == '__main__':
     observation = env.reset()
 
     # initialization variables
-    model = 'FC'
-    params = {'batch_size': 50,
+    model = 'LSTM'
+    params = {'batch_size': 1,
             'shuffle': True,
             'num_workers':6}
     LR = 1e-3 # learning rate
@@ -222,25 +227,30 @@ if __name__ == '__main__':
     test_games = 1 # how test games
     test_steps = 500 # how long each test game runs
     
-    training_data = getData(games,steps,params['shuffle'])
-    np.save('saved_training_data0.npy',training_data)
+    # training_data = getData(games,steps,params['shuffle'])
+    # np.save('saved_training_data0.npy',training_data)
 
-    testing_data = getData(games,steps,False)
-    np.save('saved_testing_data0.npy',testing_data)
+    # testing_data = getData(games,steps,False)
+    # np.save('saved_testing_data0.npy',testing_data)
 
-    options = {'model':model,'lr':LR, 'num_epochs':num_epochs,'training_data':training_data,'testing_data': testing_data,'params':params}
-    trainer = Trainer(options)
-    trainer.train()
-    trainer.test()
+    print(np.zeros(2))
 
-    fig, axs = plt.subplots(2, 1)
-    axs[0].plot(trainer.train_loss)
-    axs[0].set_ylabel('training loss')
+    # options = {'model':model,'lr':LR, 'num_epochs':num_epochs,'training_data':training_data,'testing_data': testing_data,'params':params}
+    # trainer = Trainer(options)
+    # trainer.train()
+    # trainer.test()
 
-    axs[1].plot(trainer.test_loss)
-    axs[1].set_ylabel('testing loss')
+    # # simulation(trainer.model)
 
-    fig.tight_layout()
-    plt.show()
+    # plt.close('all')
+    # fig, axs = plt.subplots(2, 1)
+    # axs[0].plot(trainer.train_loss)
+    # axs[0].set_ylabel('training loss')
+    # axs[1].plot(trainer.test_loss)
+    # axs[1].set_ylabel('testing loss')
+    # fig.tight_layout()
+    # plt.show()
+
+
     
 
