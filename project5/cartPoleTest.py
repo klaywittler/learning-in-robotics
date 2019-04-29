@@ -94,19 +94,19 @@ if __name__ == '__main__':
     #### Testing ####
     env = gym.make('CartPole-v1')
     tester = Tester()
-    episodes = 400
+    episodes = 1
     steps = 1000
     for episode in range(episodes):
         state = env.reset()
         done = False
         for time in range(steps):
-            # env.render()
+            env.render()
 
             action = tester.policy_gradient_test(state)
 
             state, reward, done, _ = env.step(action)
-            if done:
-                print(time)
-                break
+            # if done:
+            #     print(time)
+            #     break
 
     env.close() 
