@@ -12,10 +12,12 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class Model(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim, output_dim):
         super(Model, self).__init__()
-        self.l1 = nn.Linear(5, 128)
-        self.l2 = nn.Linear(128,4)
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.l1 = nn.Linear(self.input_dim, 128)
+        self.l2 = nn.Linear(128,self.output_dim)
     def forward(self, x):
         model = nn.Sequential(
             self.l1,
@@ -74,12 +76,14 @@ class Trainer(object):
         self.options = options
         # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device = torch.device('cpu')
+        self.input_dim = options['training_data']['inputs'].shape[1]
+        self.output_dim = options['training_data']['labels'].shape[1]
         if options['model'] == 'FC':
-            self.model = Model().to(self.device)
+            self.model = Model(self.input_dim,self.output_dim).to(self.device)
         elif options['model'] == 'LSTM':
             self.model = LSTM(options['params']['batch_size']).to(self.device)
         else:
-            self.model = Model().to(self.device)
+            self.model = Model(self.input_dim,self.output_dim).to(self.device)
         # define loss function and optimizer
         self.loss = torch.nn.MSELoss(reduction='sum').to(self.device) # for Global loss
         self.testLoss = torch.nn.MSELoss().to(self.device) # for Global loss
@@ -107,18 +111,21 @@ class Trainer(object):
             remaining_time = (self.options['num_epochs'] - epoch) * seconds_per_epoch
 
             epoch_loss = 0
-            print("Epoch %d/%d - Elapsed Time %f - Remaining Time %f" %
-                    (epoch, self.options['num_epochs'],
-                        elapsed_time, remaining_time))
+            if epoch > 1:
+                print("Epoch: %d/%d - Elapsed Time: %f - Remaining Time: %f - Loss: %f" %
+                        (epoch, self.options['num_epochs'],
+                            elapsed_time, remaining_time, self.train_loss[-1]))
             for local_batch, local_labels in self.train_data_loader:
                 self.model.train()                
                 self.optimizer.zero_grad()
             
                 pred = self.model(local_batch)
-                loss = self.loss(pred[-1], local_labels)
+                loss = self.loss(pred, local_labels)
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss
+                pred.detach()
+                loss.detach()
 
             self.train_loss.append(epoch_loss/len(self.train_data_loader.dataset))
 
@@ -127,30 +134,44 @@ class Trainer(object):
             self.model.eval()
             with torch.no_grad():
                 pred = self.model(local_batch)
-                loss = self.testLoss(pred[-1], local_labels)
+                loss = self.testLoss(pred, local_labels)
                 self.test_loss.append(loss)
-                print("pred:",pred)
-                print("label: ", local_labels)
+                # print("pred:",pred)
+                # print("label: ", local_labels)
+                pred.detach()
+                loss.detach()
 
-def getData(episodes=1000,steps=1000,shuffle=False, render=False):
-    inputs = np.zeros([episodes*steps,5])
-    labels = np.zeros([episodes*steps,4])
+def getData(episodes=1000,steps=1000,shuffle=False, render=False, theta = False):
+    if theta:
+        inputs = np.zeros([episodes*steps,5])
+        labels = np.zeros([episodes*steps,4])
+    else:
+        inputs = np.zeros([episodes*steps,4])
+        labels = np.zeros([episodes*steps,3])
 
     for episode in range(episodes):
         if not shuffle:
             observation = env.reset()
-            s0 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
+            if theta:
+                s0 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
+            else:
+                s0 = np.array(observation)
         for t in range(steps):
             if shuffle:
                 observation = env.reset()
-                s0 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
             if render:
                 env.render()
+            if theta:
+                s0 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
+            else:
+                s0 = np.array(observation)
             action = env.action_space.sample()
             inputs[(episode*steps)+t,:] = np.hstack((s0,action))
             observation, reward, done, info = env.step(action)
-            
-            s1 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
+            if theta:
+                s1 = np.array([observation[0], observation[1], np.arctan2(observation[1],observation[0]), observation[2]])
+            else:    
+                s1 = np.array(observation)
             labels[(episode*steps)+t,:] = s1
             s0 = s1
 
@@ -215,13 +236,16 @@ def simulation(model,games=1,steps=1000):
 
 
 if __name__ == '__main__':
+    TrainModel = True
+    SimModel = False    
+
     env = gym.make('Pendulum-v0')
     observation = env.reset()
 
     # initialization variables
     model = 'FC'
     params = {'batch_size': 1,
-            'shuffle': False,
+            'shuffle': True,
             'num_workers':6}
     LR = 1e-3 # learning rate
     num_epochs = 40 # number of times data is seen
@@ -229,33 +253,44 @@ if __name__ == '__main__':
     steps = 100 # how long each game runs
     test_games = 1 # how test games
     test_steps = 500 # how long each test game runs
+    theta = False
     
-    training_data = getData(games,steps,params['shuffle'],False)
+    training_data = getData(games,steps,shuffle=params['shuffle'],render=False,theta=theta)
     np.save('saved_training_data0.npy',training_data)
 
-    testing_data = getData(test_games,test_steps,False,False)
+    testing_data = getData(test_games,test_steps,shuffle=False,render=False,theta=theta)
     np.save('saved_testing_data0.npy',testing_data)
 
-    # print(np.zeros(2))
-
     options = {'model':model,'lr':LR, 'num_epochs':num_epochs,'training_data':training_data,'testing_data': testing_data,'params':params}
-    trainer = Trainer(options)
-    trainer.train()
-    trainer.test()
 
-    # print(trainer.test_loss)
-    # print(trainer.train_loss)
-    # simulation(trainer.model)
+    if TrainModel:
+        trainer = Trainer(options)
+        trainer.train()
+        trainer.test()
 
-    plt.close('all')
-    fig, axs = plt.subplots(2, 1)
-    axs[0].plot(trainer.train_loss)
-    axs[0].set_ylabel('training loss')
-    axs[1].plot(trainer.test_loss)
-    axs[1].set_ylabel('testing loss')
-    fig.tight_layout()
-    plt.show()
+        # simulation(trainer.model)
+        meanTest = np.mean(np.array(trainer.test_loss))
+        print("mean test error: ", meanTest)
+        if meanTest < 0.04:
+            torch.save(trainer.model.state_dict(),'pendulumModel.pt')
+        
+        fig, axs = plt.subplots(2, 1)
+        axs[0].plot(trainer.train_loss)
+        axs[0].set_ylabel('training loss')
+        axs[1].plot(trainer.test_loss)
+        axs[1].set_ylabel('testing loss')
+        fig.tight_layout()
+        plt.show()
+        plt.close('all')
+    else:
+        input_dim = options['training_data']['inputs'].shape[1]
+        output_dim = options['training_data']['labels'].shape[1]
+        model = Model()
+        model.load_state_dict(torch.load('CartPolePolicy.pt'))
+        model.eval()
 
+    if SimModel:
+        pass
 
     
 
