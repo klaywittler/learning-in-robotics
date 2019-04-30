@@ -209,21 +209,14 @@ class Policy(nn.Module):
         self.l1 = nn.Linear(self.state_space, 128, bias=False)
         self.l2 = nn.Linear(128,self.action_space, bias=False)
 
-        # self.gamma = options['gamma']
-        self.gamma = 0.99
-
         # Episode policy and reward history
         self.policy_history = Variable(torch.Tensor())
         self.reward_episode = []
+
         # Overall loss and reward history
         self.reward_history = []
         self.loss_history = []
     def forward(self, x):
-        # x = self.l1(x)
-        # x = F.dropout(x, training=self.training)
-        # x = F.relu(x)
-        # x = self.l2(x)
-        # return F.log_softmax(x,dim=-1)
         model = torch.nn.Sequential(
             self.l1,
             nn.Dropout(p=0.6),

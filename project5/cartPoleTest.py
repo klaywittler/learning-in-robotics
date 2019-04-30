@@ -11,7 +11,7 @@ import lake_env
 from tester import *
 
 
-def main(episodes=1500,steps=1000):
+def main(episodes=1000,steps=1000):
     running_reward = 10
     for episode in range(episodes):
         state = env.reset()
@@ -32,8 +32,8 @@ def main(episodes=1500,steps=1000):
         if episode % 50 == 0:
             print('Episode {}\tLst length: {:5d}\tAverage length: {:0.2f}'.format(episode, time, running_reward))
         if running_reward > env.spec.reward_threshold:
-            print('Solved! Running reward is now {} and the last episode runs to {} time steps'.format(running_reward, time))
-            break
+            print('Solved! Episode {}\t. Running reward is now {} and the last episode runs to {} time steps'.format(episode, running_reward, time))
+            
 
 
 def select_action(state):
@@ -51,7 +51,7 @@ def update_policy():
 
     # Discount future rewards back to present using gamma
     for r in policy.reward_episode[::-1]:
-        R = r + policy.gamma * R
+        R = r + gamma * R
         rewards.insert(0,R)
 
     # Scale rewards
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     #### Training ####
     # gamma = 0.99
     # LR = 0.01 # learning rate
-    # env = gym.make('CartPole-v1')
+    # env = gym.make('CartPole-v0')
     # options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
     # policy = Policy(options)
     # optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
 
     #### Testing ####
-    env = gym.make('CartPole-v1')
+    env = gym.make('CartPole-v0')
     tester = Tester()
     episodes = 1
     steps = 1000
