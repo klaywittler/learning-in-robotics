@@ -33,6 +33,7 @@ def main(episodes=1000,steps=1000):
             print('Episode {}\tLst length: {:5d}\tAverage length: {:0.2f}'.format(episode, time, running_reward))
         if running_reward > env.spec.reward_threshold:
             print('Solved! Episode {}\t. Running reward is now {} and the last episode runs to {} time steps'.format(episode, running_reward, time))
+            break
             
 
 
@@ -79,10 +80,11 @@ if __name__ == '__main__':
     # Policy Gradient #
     ###################
 
+    s = 'CartPole-v1'
     #### Training ####
     # gamma = 0.99
     # LR = 0.01 # learning rate
-    # env = gym.make('CartPole-v0')
+    # env = gym.make('CartPole-v1')
     # options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
     # policy = Policy(options)
     # optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
@@ -92,7 +94,7 @@ if __name__ == '__main__':
 
 
     #### Testing ####
-    env = gym.make('CartPole-v0')
+    env = gym.make('CartPole-v1')
     tester = Tester()
     episodes = 1
     steps = 1000
@@ -105,8 +107,8 @@ if __name__ == '__main__':
             action = tester.policy_gradient_test(state)
 
             state, reward, done, _ = env.step(action)
-            # if done:
-            #     print(time)
-            #     break
+            if done:
+                print(time)
+                break
 
     env.close() 

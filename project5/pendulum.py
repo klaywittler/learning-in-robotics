@@ -180,11 +180,7 @@ def getData(episodes=1000,steps=1000,shuffle=False, render=False, theta = False)
     return training_data
 
 
-def Astar(map, start):
-    # parent = np.nan()
-    pass
-
-def getCostMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
+def getMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     theta_lower = -m.pi
     theta_upper = m.pi
     dtheta_lower = -8
@@ -196,48 +192,60 @@ def getCostMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     dtheta_space = np.linspace(dtheta_lower,dtheta_upper,n_dtheta)
     action_space = np.linspace(u_lower,u_upper,n_u)
 
-    cost = np.empty([theta_space.size,dtheta_space.size,action_space.size])
+    return [theta_space, dtheta_space, action_space]
 
-    t=0
-    for theta in theta_space:
-        dt = 0
-        for dtheta in dtheta_space:
-            a = 0
-            for action in action_space:
-                sa0 = torch.tensor([np.cos(theta), np.sin(theta), theta, dtheta, action])
-                predict_state = model(sa0)
+def Astar(model, space, start, goal = np.zeros(3)):
+    theta_space = space[0]
+    dtheta_space = space[1]
+    action_space = space[2]
 
-                # heuristic
-                h = -(predict_state[2]**2 + predict_state[3]**2 + 0.001*action**2)
-                g = -abs(action) #-abs(predict_state[0][3])
-                cost[t,dt,a] = h + g
-                a += 1
-            dt += 1
-        t += 1  
+    front = [start]
+    explored = []
+    currentIndex = 0
 
-    return [cost, theta_space, dtheta_space, action_space]
+    # while len(front) > 0:
+    if np.linalg.norm(start-goal) < 0.01:
+        path = np.zeros(1)    
+    front.pop(currentIndex)
+    explored.append(start)
+
+
+    theta = np.repeat(start[0],len(action_space),axis=0)
+    thetaDot = np.repeat(start[1],len(action_space),axis=0)
+    state = np.array([np.cos(theta),np.sin(theta), thetaDot, action_space]).T
+    inputs = torch.from_numpy(state).float()
+    outputs = model(inputs).detach().numpy()
+    neighbors = np.array([np.arctan2(outputs[:,1],outputs[:,0]), outputs[:,2]]).T
+    h = -(neighbors[:,0]**2 + 0.1*neighbors[:,1]**2 + 0.001*state[:,2]**2)
+    front.append(neighbors)
+    print(neighbors)
+
+
+
+
+
+    
+    return np.zeros(1)
+
 
 def simulation(model,games=1,steps=1000):
-    [cost, theta_space, dtheta_space, action_space] = getCostMap(model)
+    disc_space = getMap(model)
     for i_episode in range(games):
         observation = env.reset()
-        for t in range(steps):
+        path = Astar(model, disc_space, observation)
+        for t in range(len(path)):
             env.render()
-            theta = np.arctan2(observation[1],observation[0]) 
-            dtheta = observation[2]
-            th = np.where(theta_space>=theta) 
-            dth = np.where(dtheta_space>=dtheta)
-            a = cost[th[0][0],dth[0][0],:].argmax()
-            action = [action_space[a]]
-            print(action)
+            action = path[t]
             observation, reward, done, info = env.step(action)
+            if done:
+                break
                     
     env.close()
 
 
 if __name__ == '__main__':
-    TrainModel = True
-    SimModel = False    
+    TrainModel = False
+    SimModel = True    
 
     env = gym.make('Pendulum-v0')
     observation = env.reset()
@@ -282,15 +290,17 @@ if __name__ == '__main__':
         fig.tight_layout()
         plt.show()
         plt.close('all')
+
+        model = trainer.model
     else:
         input_dim = options['training_data']['inputs'].shape[1]
         output_dim = options['training_data']['labels'].shape[1]
-        model = Model()
-        model.load_state_dict(torch.load('CartPolePolicy.pt'))
+        model = Model(input_dim,output_dim)
+        model.load_state_dict(torch.load('pendulumModel.pt'))
         model.eval()
 
     if SimModel:
-        pass
+        simulation(model)
 
     
 
