@@ -180,6 +180,29 @@ def getData(episodes=1000,steps=1000,shuffle=False, render=False, theta = False)
     return training_data
 
 
+def getMeshMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
+    theta_lower = -m.pi
+    theta_upper = m.pi
+    dtheta_lower = -8
+    dtheta_upper = 8
+    u_lower = -2
+    u_upper = 2
+
+    theta_space = np.linspace(theta_lower,theta_upper,n_theta)
+    dtheta_space = np.linspace(dtheta_lower,dtheta_upper,n_dtheta)
+    action_space = np.linspace(u_lower,u_upper,n_u)
+
+    grid = np.stack(np.meshgrid(theta_space, dtheta_space, action_space),-1).reshape(-1,3)
+    state = np.array([np.cos(grid[:,0]),np.sin(grid[:,0]), grid[:,1], grid[:,2]]).T
+
+    inputs = torch.from_numpy(state).float()
+    outputs = model(inputs).detach().numpy()
+
+
+
+
+    return [theta_space, dtheta_space, action_space]
+
 def getMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     theta_lower = -m.pi
     theta_upper = m.pi
@@ -194,38 +217,68 @@ def getMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
 
     return [theta_space, dtheta_space, action_space]
 
-def Astar(model, space, start, goal = np.zeros(3)):
+def AstarMesh(model, space, start, goal_state = np.zeros(2)):
+
+    return 0
+
+def Astar(model, space, start, goal_state = np.zeros(2)):
+    start = np.array([np.arctan2(start[1],start[0]), start[2]])
     theta_space = space[0]
     dtheta_space = space[1]
     action_space = space[2]
 
-    front = [start]
-    explored = []
-    currentIndex = 0
+    goal_theta_bin = np.digitize(goal_state[0],theta_space)
+    goal_dtheta_bin = np.digitize(goal_state[1],dtheta_space)
+    goal = tuple(np.array([goal_theta_bin,goal_dtheta_bin]))
 
-    # while len(front) > 0:
-    if np.linalg.norm(start-goal) < 0.01:
-        path = np.zeros(1)    
-    front.pop(currentIndex)
-    explored.append(start)
+    theta_bin = np.digitize(start[0],theta_space)
+    dtheta_bin = np.digitize(start[1],dtheta_space)
+    current = tuple(np.array([theta_bin,dtheta_bin]))
+    front = {current:{'parent':None,'action':None,'value':0}}
+    explored = {}
 
+    count = 0
+    while len(front) > 0:
+        explored.update({current:front[current]})
+        del front[current]
 
-    theta = np.repeat(start[0],len(action_space),axis=0)
-    thetaDot = np.repeat(start[1],len(action_space),axis=0)
-    state = np.array([np.cos(theta),np.sin(theta), thetaDot, action_space]).T
-    inputs = torch.from_numpy(state).float()
-    outputs = model(inputs).detach().numpy()
-    neighbors = np.array([np.arctan2(outputs[:,1],outputs[:,0]), outputs[:,2]]).T
-    h = -(neighbors[:,0]**2 + 0.1*neighbors[:,1]**2 + 0.001*state[:,2]**2)
-    front.append(neighbors)
-    print(neighbors)
+        if current == goal or count > 5000:
+            print('finding path')
+            path = []
+            parent = explored[current]['parent']
+            trace = 0
+            while parent is not None and trace < 5000: 
+                path.append(explored[current]['action'])
+                current = parent
+                parent = explored[current]['parent']
+                trace += 1
+                print('finding path',trace, parent)
+            return path
 
+        theta = np.repeat(theta_space[current[0]],len(action_space),axis=0)
+        thetaDot = np.repeat(theta_space[current[1]],len(action_space),axis=0)
 
+        state = np.array([np.cos(theta),np.sin(theta), thetaDot, action_space]).T
+        inputs = torch.from_numpy(state).float()
+        outputs = model(inputs).detach().numpy()
+        neighbors = np.array([np.arctan2(outputs[:,1],outputs[:,0]), outputs[:,2]]).T
+        h = -(neighbors[:,0]**2 + 0.1*neighbors[:,1]**2 + 0.001*state[:,2]**2)
 
+        theta_bins = np.digitize(neighbors[:,0],theta_space)
+        dtheta_bins = np.digitize(neighbors[:,1],dtheta_space)
+        indTup = map(tuple, np.array([theta_bins,dtheta_bins]).T)
+        for i, t in enumerate(indTup):
+            if t in front:
+                if front[t]['value'] > h[i]:
+                    front[t] = {'action':action_space[i],'parent':(theta_bin,dtheta_bin),'value':h[i]}
+            else:
+                front[t] = {'action':action_space[i],'parent':(theta_bin,dtheta_bin),'value':h[i]}
 
+        current = min(front, key=front.get)
+        count += 1
+        print(count, current)
 
-    
-    return np.zeros(1)
+    return path
 
 
 def simulation(model,games=1,steps=1000):
@@ -235,7 +288,23 @@ def simulation(model,games=1,steps=1000):
         path = Astar(model, disc_space, observation)
         for t in range(len(path)):
             env.render()
-            action = path[t]
+            action = np.array([path[t]])
+            print(action)
+            observation, reward, done, info = env.step(action)
+            if done:
+                break
+                    
+    env.close()
+
+def simulationMesh(model,games=1,steps=1000):
+    disc_space = getMeshMap(model)
+    for i_episode in range(games):
+        observation = env.reset()
+        path = AstarMesh(model, disc_space, observation)
+        for t in range(len(path)):
+            env.render()
+            action = np.array([path[t]])
+            print(action)
             observation, reward, done, info = env.step(action)
             if done:
                 break
@@ -279,7 +348,7 @@ if __name__ == '__main__':
         # simulation(trainer.model)
         meanTest = np.mean(np.array(trainer.test_loss))
         print("mean test error: ", meanTest)
-        if meanTest < 0.04:
+        if meanTest < 0.03:
             torch.save(trainer.model.state_dict(),'pendulumModel.pt')
         
         fig, axs = plt.subplots(2, 1)
@@ -300,7 +369,22 @@ if __name__ == '__main__':
         model.eval()
 
     if SimModel:
-        simulation(model)
+        # simulationMesh(model)
+        a = np.array([1,2,3,4])
+        b = np.array([10,11,12])
+        c = np.array([20,21,22])
+        grid = np.stack(np.meshgrid(a,b,c),-1).reshape(-1,3)
+        print(grid[:,0:2].shape)
+
+        grid2 = np.array(np.meshgrid(a,b)).T.reshape(-1,2)
+
+        print(grid2.shape)
+        
+        # grid3 = np.zeros([len(a)*len(b),len(c)])
+        grid3 = grid[:,0:2].reshape(len(a)*len(b),len(c),2)
+        print(grid3)
+
+
 
     
 
