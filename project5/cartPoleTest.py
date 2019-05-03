@@ -82,21 +82,21 @@ if __name__ == '__main__':
 
     s = 'CartPole-v1'
     #### Training ####
-    # gamma = 0.99
-    # LR = 0.01 # learning rate
-    # env = gym.make('CartPole-v1')
-    # options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
-    # policy = Policy(options)
-    # optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
-    # main()
-    # torch.save(policy.state_dict(),'CartPolePolicy.pt')
-    # env.close()
+    gamma = 0.99
+    LR = 1e-2 # learning rate
+    env = gym.make('CartPole-v1')
+    options = {'gamma':gamma,'lr':LR,'state_space':env.observation_space.shape[0],'action_space':env.action_space.n}
+    policy = Policy(options)
+    optimizer = torch.optim.Adam(policy.parameters(),lr = options['lr'])
+    main()
+    torch.save(policy.state_dict(),'CartPolePolicy.pt')
+    env.close()
 
 
     #### Testing ####
     env = gym.make('CartPole-v1')
     tester = Tester()
-    episodes = 1
+    episodes = 4
     steps = 1000
     for episode in range(episodes):
         state = env.reset()

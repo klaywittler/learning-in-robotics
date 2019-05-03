@@ -9,6 +9,7 @@ from torch.autograd import Variable
 from time import time
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
+import time
 
 
 class Model(nn.Module):
@@ -136,8 +137,6 @@ class Trainer(object):
                 pred = self.model(local_batch)
                 loss = self.testLoss(pred, local_labels)
                 self.test_loss.append(loss)
-                # print("pred:",pred)
-                # print("label: ", local_labels)
                 pred.detach()
                 loss.detach()
 
@@ -180,7 +179,48 @@ def getData(episodes=1000,steps=1000,shuffle=False, render=False, theta = False)
     return training_data
 
 
-def getMeshMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
+def getMeshMap(model, n_theta = 35, n_dtheta = 35, n_u = 95):
+    theta_lower = -np.pi
+    theta_upper = np.pi
+    dtheta_lower = -8
+    dtheta_upper = 8
+    u_lower = -2
+    u_upper = 2
+
+    theta_space = np.linspace(theta_lower,theta_upper,n_theta)
+    dtheta_space = np.linspace(dtheta_lower,dtheta_upper,n_dtheta)
+    action_space = np.linspace(u_lower,u_upper,n_u)
+
+    theta_idx = np.digitize(theta_space,theta_space)
+    dtheta_idx = np.digitize(dtheta_space,dtheta_space)
+    
+    state = np.stack(np.meshgrid(theta_space, dtheta_space, action_space),-1).reshape(-1,3)
+
+    # state = np.array([np.cos(state[:,0]),np.sin(state[:,0]), state[:,1], state[:,2]]).T
+    # inputs = torch.from_numpy(state).float()
+    # outputs = model(inputs).detach().numpy()
+    # outputs = np.array([((np.arctan2(outputs[:,1],outputs[:,0]) + np.pi) % (2*np.pi))-np.pi ,outputs[:,2]]).T
+
+    g = 10.
+    m = 1.
+    l = 1.
+    dt = 0.05
+    newthdot = state[:,1] + (-3*g/(2*l) * np.sin(state[:,0] + np.pi) + 3./(m*l**2)*state[:,2]) * dt
+    newth = state[:,0] + newthdot*dt
+    newthdot = np.clip(newthdot, dtheta_lower, dtheta_upper)
+    # newth = np.clip(newth, theta_lower, theta_upper)
+    newth = (((newth+np.pi) % (2*np.pi)) - np.pi)
+    outputs = np.array([newth, newthdot]).T
+
+
+    grid =  np.stack(np.meshgrid(theta_space, dtheta_space),-1).reshape(-1,2)
+    gridIdx = np.stack(np.meshgrid(theta_idx, dtheta_idx),-1).reshape(-1,2)
+    out = outputs.reshape(len(theta_space)*len(dtheta_space),len(action_space),2)
+    outIdx = np.array([np.digitize(outputs[:,0],theta_space),np.digitize(outputs[:,1],dtheta_space)]).T.reshape(len(theta_space)*len(dtheta_space),len(action_space),2)
+
+    return [grid, gridIdx, out, outIdx, theta_space, dtheta_space, action_space]
+
+def getMap(model, n_theta = 35, n_dtheta = 35, n_u = 10):
     theta_lower = -m.pi
     theta_upper = m.pi
     dtheta_lower = -8
@@ -192,34 +232,99 @@ def getMeshMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
     dtheta_space = np.linspace(dtheta_lower,dtheta_upper,n_dtheta)
     action_space = np.linspace(u_lower,u_upper,n_u)
 
-    grid = np.stack(np.meshgrid(theta_space, dtheta_space, action_space),-1).reshape(-1,3)
-    state = np.array([np.cos(grid[:,0]),np.sin(grid[:,0]), grid[:,1], grid[:,2]]).T
-
-    inputs = torch.from_numpy(state).float()
-    outputs = model(inputs).detach().numpy()
-
-
-
-
     return [theta_space, dtheta_space, action_space]
 
-def getMap(model, n_theta = 35, n_dtheta = 35, n_u = 35):
-    theta_lower = -m.pi
-    theta_upper = m.pi
-    dtheta_lower = -8
-    dtheta_upper = 8
-    u_lower = -2
-    u_upper = 2
+def AstarMesh(model, space, start, goal = np.zeros(2)):
+    grid =  space[0]
+    gridIdx = space[1]
+    out = space[2]
+    outIdx = space[3]
+    theta_space = space[4]
+    dtheta_space = space[5]
+    action_space = space[6]
 
-    theta_space = np.linspace(theta_lower,theta_upper,n_theta)
-    dtheta_space = np.linspace(dtheta_lower,dtheta_upper,n_dtheta)
-    action_space = np.linspace(u_lower,u_upper,n_u)
+    start = np.array([np.arctan2(start[1],start[0]), start[2]])
+    startIdx = np.array([np.digitize(start[0],theta_space),np.digitize(start[1],dtheta_space)])
+    goalIdx = np.array([np.digitize(goal[0],theta_space),np.digitize(goal[1],dtheta_space)])
 
-    return [theta_space, dtheta_space, action_space]
+    # print(outIdx)
+    # print(np.where((outIdx == goalIdx).all(axis=2))[0][0])
 
-def AstarMesh(model, space, start, goal_state = np.zeros(2)):
+    parent = np.full(grid.shape[0], None)
+    parent_action = np.full(grid.shape[0], None)
+    g = np.full(grid.shape[0], np.inf)
+    # h = (grid[:,0]**2 + 0.1*grid[:,1]**2 + 0.001*action_space**2)
+    vs = np.where((gridIdx == startIdx).all(axis=1))[0][0]
+    vg = np.where((gridIdx == goalIdx).all(axis=1))[0][0]
+    
+    g[vs] = 0
+    f = g
+    fMin = f[vs]
+    u = vs
+    front = np.zeros(grid.shape[0], dtype=bool)
+    explored = np.zeros(grid.shape[0], dtype=bool)
+    front[u] = 1
+    num_expanded = 0
+    while explored[vg] == False and fMin != np.inf:
+        # move node from frontier to explored
+        front[u] = False
+        explored[u] = True
 
-    return 0
+        # find neightboring nodes
+        neighbors = outIdx[u,:,:].reshape(len(action_space),2)
+        # print(outIdx[u,:,:])
+        nIdx = np.zeros(neighbors.shape[0], dtype=np.int_)
+        a = action_space
+        dele = []
+        for i, v in enumerate(neighbors):
+            # print(np.where((gridIdx == neighbors[i,:]).all(axis=1)))
+            nIdx[i] = np.where((gridIdx == neighbors[i,:]).all(axis=1))[0][0]
+        #     if explored[nIdx[i]]:
+        #         dele.append(i)
+
+        # neighbors = np.delete(neighbors,dele)
+        # nIdx = np.delete(nIdx,dele)
+        # a = np.delete(a,dele)
+
+        front[nIdx] = True
+
+        # update cost
+        d = g[u] + a**2 #+ (grid[nIdx,0]**2 + 0.1*grid[nIdx,1]**2 + 0.001*a**2)
+        # print(d)
+        lowIdx = np.where(d < g[nIdx])[0]
+        g[nIdx[lowIdx]] = d[lowIdx]
+        parent[nIdx[lowIdx]] = u
+        parent_action[nIdx[lowIdx]] = lowIdx
+        f[nIdx[lowIdx]] = g[nIdx[lowIdx]]  + (grid[nIdx[lowIdx],0]**2 + 0.1*grid[nIdx[lowIdx],1]**2 + 0.001*a[lowIdx]**2)
+
+        # find new point to explore
+        uOld = u
+        f[u] = np.inf
+        u = np.argmin(f)
+        fMin = f[u]
+        # print(u)
+        # print(fMin)
+        # print(explored[u])
+
+        num_expanded += 1
+        if num_expanded % 1000 == 0:
+            print(num_expanded)
+
+
+    print(vg, gridIdx[vg,:], grid[vg,:], num_expanded)
+    if not explored[vg]:
+        print('not found')
+        return []
+
+    path = []
+    # u = uOld
+    while parent[u] is not None:
+        path.append(action_space[parent_action[u]])
+        u = parent[u]
+
+
+    print('return', explored[vg], num_expanded)
+    return path[::-1]
 
 def Astar(model, space, start, goal_state = np.zeros(2)):
     start = np.array([np.arctan2(start[1],start[0]), start[2]])
@@ -301,11 +406,15 @@ def simulationMesh(model,games=1,steps=1000):
     for i_episode in range(games):
         observation = env.reset()
         path = AstarMesh(model, disc_space, observation)
+        print(path)
+        # for t in range(steps):
         for t in range(len(path)):
+            # path = AstarMesh(model, disc_space, observation)
             env.render()
             action = np.array([path[t]])
-            print(action)
-            observation, reward, done, info = env.step(action)
+            # print(action)
+            observation, reward, done, info = env.step(action) 
+            time.sleep(0.5)
             if done:
                 break
                     
@@ -369,20 +478,7 @@ if __name__ == '__main__':
         model.eval()
 
     if SimModel:
-        # simulationMesh(model)
-        a = np.array([1,2,3,4])
-        b = np.array([10,11,12])
-        c = np.array([20,21,22])
-        grid = np.stack(np.meshgrid(a,b,c),-1).reshape(-1,3)
-        print(grid[:,0:2].shape)
-
-        grid2 = np.array(np.meshgrid(a,b)).T.reshape(-1,2)
-
-        print(grid2.shape)
-        
-        # grid3 = np.zeros([len(a)*len(b),len(c)])
-        grid3 = grid[:,0:2].reshape(len(a)*len(b),len(c),2)
-        print(grid3)
+        simulationMesh(model)
 
 
 

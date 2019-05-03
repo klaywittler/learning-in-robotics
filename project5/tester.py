@@ -207,6 +207,7 @@ class Policy(nn.Module):
         self.state_space = self.options['state_space']
         self.action_space = self.options['action_space']
         self.l1 = nn.Linear(self.state_space, 128, bias=False)
+        self.d = nn.Dropout(p=0.6)
         self.l2 = nn.Linear(128,self.action_space, bias=False)
 
         # Episode policy and reward history
