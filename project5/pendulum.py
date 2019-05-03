@@ -274,12 +274,12 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
         for i, v in enumerate(neighbors):
             # print(np.where((gridIdx == neighbors[i,:]).all(axis=1)))
             nIdx[i] = np.where((gridIdx == neighbors[i,:]).all(axis=1))[0][0]
-        #     if explored[nIdx[i]]:
-        #         dele.append(i)
+            if explored[nIdx[i]]:
+                dele.append(i)
 
-        # neighbors = np.delete(neighbors,dele)
-        # nIdx = np.delete(nIdx,dele)
-        # a = np.delete(a,dele)
+        neighbors = np.delete(neighbors,dele)
+        nIdx = np.delete(nIdx,dele)
+        a = np.delete(a,dele)
 
         front[nIdx] = True
 
@@ -319,9 +319,12 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
     while parent[u] is not None:
         path.append(action_space[parent_action[u]])
         u = parent[u]
+        # print(u)
         p += 1
         if p > num_expanded:
-            print(p)
+            pass
+            # print(u)
+            # print(p)
 
 
     print('return', explored[vg], num_expanded)
