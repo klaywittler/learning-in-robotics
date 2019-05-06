@@ -196,21 +196,21 @@ def getMeshMap(model, n_theta = 15, n_dtheta = 15, n_u = 15):
     
     state = np.stack(np.meshgrid(theta_space, dtheta_space, action_space),-1).reshape(-1,3)
 
-    state = np.array([np.cos(state[:,0]),np.sin(state[:,0]), state[:,1], state[:,2]]).T
-    inputs = torch.from_numpy(state).float()
-    outputs = model(inputs).detach().numpy()
-    outputs = np.array([((np.arctan2(outputs[:,1],outputs[:,0]) + np.pi) % (2*np.pi))-np.pi ,outputs[:,2]]).T
+    # state = np.array([np.cos(state[:,0]),np.sin(state[:,0]), state[:,1], state[:,2]]).T
+    # inputs = torch.from_numpy(state).float()
+    # outputs = model(inputs).detach().numpy()
+    # outputs = np.array([((np.arctan2(outputs[:,1],outputs[:,0]) + np.pi) % (2*np.pi))-np.pi ,outputs[:,2]]).T
 
-    # g = 10.
-    # m = 1.
-    # l = 1.
-    # dt = 0.05
-    # newthdot = state[:,1] + (-3*g/(2*l) * np.sin(state[:,0] + np.pi) + 3./(m*l**2)*state[:,2]) * dt
-    # newth = state[:,0] + newthdot*dt
-    # newthdot = np.clip(newthdot, dtheta_lower, dtheta_upper)
-    # # newth = np.clip(newth, theta_lower, theta_upper)
-    # newth = (((newth+np.pi) % (2*np.pi)) - np.pi)
-    # outputs = np.array([newth, newthdot]).T
+    g = 10.
+    m = 1.
+    l = 1.
+    dt = 0.05
+    newthdot = state[:,1] + (-3*g/(2*l) * np.sin(state[:,0] + np.pi) + 3./(m*l**2)*state[:,2]) * dt
+    newth = state[:,0] + newthdot*dt
+    newthdot = np.clip(newthdot, dtheta_lower, dtheta_upper)
+    # newth = np.clip(newth, theta_lower, theta_upper)
+    newth = (((newth+np.pi) % (2*np.pi)) - np.pi)
+    outputs = np.array([newth, newthdot]).T
 
 
     grid =  np.stack(np.meshgrid(theta_space, dtheta_space),-1).reshape(-1,2)
@@ -268,30 +268,37 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
 
         # find neightboring nodes
         neighbors = outIdx[u,:,:].reshape(len(action_space),2)
+        print(out[u,:,:])
         nIdx = np.zeros(neighbors.shape[0], dtype=np.int_)
         a = action_space
         dele = []
         for i, v in enumerate(neighbors):
-            # print(np.where((gridIdx == neighbors[i,:]).all(axis=1)))
+            print(np.where((gridIdx == neighbors[i,:]).all(axis=1)))
             nIdx[i] = np.where((gridIdx == neighbors[i,:]).all(axis=1))[0][0]
             if explored[nIdx[i]]:
                 dele.append(i)
 
         neighbors = np.delete(neighbors,dele)
+        # print('n2', neighbors.shape)
+        # print('n1: ', nIdx)
         nIdx = np.delete(nIdx,dele)
         a = np.delete(a,dele)
 
         front[nIdx] = True
 
         # update cost
-        d = (grid[nIdx,0]**2 + grid[nIdx,1]**2 + 0.001*a**2)
-        # print(d)
+        d = g[u] + np.ones(a.shape)#(grid[nIdx,0]**2 + grid[nIdx,1]**2 + 0.001*a**2)
+        print('d: ', d)
+        print('g: ', g[nIdx])
         lowIdx = np.where(d < g[nIdx])[0]
         g[nIdx[lowIdx]] = d[lowIdx]
         parent[nIdx[lowIdx]] = u
         parent_action[nIdx[lowIdx]] = lowIdx
-        h = grid[nIdx[lowIdx],1]*a[lowIdx]*(np.pi/4 - grid[nIdx[lowIdx],0])/abs(np.pi/4 - grid[nIdx[lowIdx],0])
-        f[nIdx[lowIdx]] = g[nIdx[lowIdx]] #+ 10*h #+ (grid[nIdx[lowIdx],0]**2 + 0.1*grid[nIdx[lowIdx],1]**2 + 0.001*a[lowIdx]**2)
+        c = np.ones(grid[nIdx[lowIdx],0].shape)
+        c[np.where(abs(grid[nIdx[lowIdx],0]) > np.pi/4)] = -1 
+
+        h = grid[nIdx[lowIdx],1]*a[lowIdx]*c
+        f[nIdx[lowIdx]] = g[nIdx[lowIdx]] #+ h
 
         # find new point to explore
         uOld = u
@@ -307,7 +314,7 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
             print(num_expanded)
 
 
-    print(vg, gridIdx[vg,:], gridIdx[uOld,:], num_expanded)
+    print(vg, gridIdx[vg,:], gridIdx[u,:], num_expanded)
     if not explored[vg]:
         print('not found')
         return []
@@ -319,7 +326,7 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
     while parent[u] is not None:
         path.append(action_space[parent_action[u]])
         u = parent[u]
-        # print(u)
+        print(u)
         p += 1
         if p > num_expanded:
             pass
