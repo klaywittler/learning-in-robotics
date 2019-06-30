@@ -1,5 +1,0 @@
-# Build
-venv
-*.pyc
-.idea
-__pycache__
