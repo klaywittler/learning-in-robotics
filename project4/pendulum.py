@@ -279,15 +279,13 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
                 dele.append(i)
 
         neighbors = np.delete(neighbors,dele)
-        # print('n2', neighbors.shape)
-        # print('n1: ', nIdx)
         nIdx = np.delete(nIdx,dele)
         a = np.delete(a,dele)
 
         front[nIdx] = True
 
         # update cost
-        d = g[u] + np.ones(a.shape)#(grid[nIdx,0]**2 + grid[nIdx,1]**2 + 0.001*a**2)
+        d = g[u] + (grid[nIdx,0]**2 + grid[nIdx,1]**2 + 0.001*a**2)
         print('d: ', d)
         print('g: ', g[nIdx])
         lowIdx = np.where(d < g[nIdx])[0]
@@ -305,9 +303,6 @@ def AstarMesh(model, space, start, goal = np.zeros(2)):
         f[u] = np.inf
         u = np.argmin(f)
         fMin = f[u]
-        # print(u)
-        # print(fMin)
-        # print(explored[u])
 
         num_expanded += 1
         if num_expanded % 1000 == 0:

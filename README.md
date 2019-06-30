@@ -3,9 +3,13 @@
 **Prerequisites**
 
 numpy
+math
 PyQt5
 pyqtgraph
+matplotlib
 scipy
+pytorch
+gym
 
 ## project 1
 
@@ -26,3 +30,7 @@ Unscented Kalman Filter for rotation estimation using quaternions. Result in rol
 
 SLAM using Extended Kalman Filter on Victoria park dataset of a vehicle driving around observing trees.
 ![](images/p3_EKF_SLAM.PNG)
+
+## project 4
+Policy gradient reinforcement learning on Open AI gym cartpole.
+![](images/p4_cartpole_policyGradient.PNG)
