@@ -28,7 +28,9 @@ Unscented Kalman Filter for rotation estimation using quaternions. Result in rol
 
 ## project 3
 
-SLAM using Extended Kalman Filter on Victoria park dataset of a vehicle driving around observing trees.
+SLAM on Victoria park dataset using Extended Kalman Filter to combine predicted dynamics from wheel encoder and periodic gps measurements of a vehicle driving around observing trees. Each tree detected from laser maeasurement is added to the state to create a map. Mahlanobis distance is used to determine if a tree is already apart of the map.
+
+
 ![](images/p3_EKF_SLAM.PNG)
 
 ## project 4
